@@ -9,6 +9,8 @@ def solve_instance (instance):
 
 if __name__ == '__main__':
 
+    from matplotlib import pyplot as plt
+
     # create the MIP model
     model = Model('HashCodeSingleTargetSubproblem')
     s = 3
@@ -63,23 +65,31 @@ if __name__ == '__main__':
     for i in range (f):
         model += xsum(x[i][j] for j in range(s)) >= 1
 
-    # non-concurrent compilation, case a
+    # non-concurrent compilation, case t_{f, s} >= t_{f, s'}
     for (j, k) in product(range(f), range(f)):
         if (j != k):
             for i in range(s):
                 model += t[j][i] >= t[k][i] + c[k] - bigM*(3 - x[j][i] - x[k][i] - (1 - y[j][k][i]))
 
-    # non-concurrent compilation, case b
+    # non-concurrent compilation, case t_{f, s} < t_{f, s'}
     for (j, k) in product(range(f), range(f)):
         if (j != k):
             for i in range(s):
-                model += t[k][i] >= t[j][i] + c[j] + r[j] - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
+                model += t[k][i] >= t[j][i] + c[j] - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
 
     model.objective = z
     status = model.optimize()
 
-    print (status)
+    assert (status == OptimizationStatus.OPTIMAL)
     print("Completion time: ", z.x)
     for (j, i) in product(range(f), range(s)):
         if (x[j][i].x >= 0.99):
             print("compilation %d starts on server %d at time %g " % (j+1, i+1, t[j][i].x))
+
+    # plot a sketch of the subproblem result
+    fig, ax = plt.subplots()
+    for (j, i) in product(range(f), range(s)):
+        if (x[j][i].x >= 0.99):
+            ax.barh(i, width=c[j], left=t[j][i].x)
+
+    plt.show ()
