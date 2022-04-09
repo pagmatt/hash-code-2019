@@ -39,6 +39,11 @@ def solve_sub_instance (sub_instance: SubInstance):
     bigM = 1.5 * (sum ([file.ctime for file in sub_instance.files]) 
                 + sum ([file.rtime for file in sub_instance.files]))
 
+    # constraints to try and reduce the computational load
+    model += z <= sub_instance.get_deadline()
+    for (i, j) in product(range(f), range(s)):
+        model += t[i][j] <= sub_instance.get_deadline()
+
     # definition of the dummy objective
     for (i, j) in product(range(f), range(s)):
         model += z >= t[i][j] - bigM*(1 - x[i][j])
@@ -48,15 +53,17 @@ def solve_sub_instance (sub_instance: SubInstance):
         deps = sub_instance.files[j].dependencies
         for dep in deps:
             for i in range(s):
-                model += t[j][i] >= t[dep][i] + sub_instance.files[dep].ctime - bigM*(2 - x[j][i] - x[dep][i])
+                ctime, rtime, idx = sub_instance.get_times_and_idx (dep)
+                model += t[j][i] >= t[idx][i] + ctime - bigM*(2 - x[j][i] - x[idx][i])
 
     # dependency constraint on different server 
     for j in range(f):
-        deps = d[j]
+        deps = sub_instance.files[j].dependencies
         for dep in deps:
             for (i, k) in product(range(s), range(s)):
                 if (i != k): # if different servers
-                    model += t[j][i] >= t[dep][k] + c[dep] + r[dep] - bigM*(2 - x[j][i] - x[dep][k])
+                    ctime, rtime, idx = sub_instance.get_times_and_idx (dep)
+                    model += t[j][i] >= t[idx][k] + ctime + rtime - bigM*(2 - x[j][i] - x[idx][k])
 
     # all files must be compiled
     for i in range (f):
@@ -66,18 +73,18 @@ def solve_sub_instance (sub_instance: SubInstance):
     for (j, k) in product(range(f), range(f)):
         if (j != k):
             for i in range(s):
-                model += t[j][i] >= t[k][i] + c[k] - bigM*(3 - x[j][i] - x[k][i] - (1 - y[j][k][i]))
+                model += t[j][i] >= t[k][i] + sub_instance.files[k].ctime - bigM*(3 - x[j][i] - x[k][i] - (1 - y[j][k][i]))
 
     # non-concurrent compilation, case t_{f, s} < t_{f, s'}
     for (j, k) in product(range(f), range(f)):
         if (j != k):
             for i in range(s):
-                model += t[k][i] >= t[j][i] + c[j] - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
+                model += t[k][i] >= t[j][i] + sub_instance.files[j].ctime - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
 
     model.objective = z
-    status = model.optimize()
+    status = model.optimize(max_seconds_same_incumbent=20)
 
-    assert (status == OptimizationStatus.OPTIMAL)
+    #assert (status == OptimizationStatus.OPTIMAL)
     print("Completion time: ", z.x)
     for (j, i) in product(range(f), range(s)):
         if (x[j][i].x >= 0.99):
@@ -88,7 +95,7 @@ def solve_sub_instance (sub_instance: SubInstance):
 def rec_load_dependencies(instance: Instance, file: CompiledFile):
     dependencies = []
     for dep in instance.files[file].dependencies:
-        dependencies.append(dep)
+        dependencies.append(instance.files[dep])
         if (len(instance.files[dep].dependencies) > 0):
             dependencies.extend (rec_load_dependencies (instance, dep))
     
@@ -101,18 +108,12 @@ def solve_instance(instance: Instance):
         assert(target in instance.files)
 
         # create sub-problem
-        relevant_files = [target]
+        relevant_files = [instance.files[target]]
         dependencies = rec_load_dependencies(instance, target)
         relevant_files.extend(dependencies)
-        sub_problem = SubInstance ()
-        sub_problem.files = relevant_files
-        sub_problem.target = target
-        sub_problem.nservers = instance.nservers
-
+        sub_problem = SubInstance (relevant_files, target, instance.nservers)
         # solve it
-
-
-
+        solve_sub_instance(sub_problem)
 
 
 if __name__ == '__main__':
@@ -126,3 +127,4 @@ if __name__ == '__main__':
     #         ax.barh(i, width=c[j], left=t[j][i].x)
 
     # plt.show ()
+    print('nope')
