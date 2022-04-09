@@ -1,3 +1,5 @@
+import numpy as np
+from matplotlib import pyplot as plt
 class CompiledFile():
 	def __init__(self, name, ctime, rtime, dependencies):
 		self.name = name
@@ -9,7 +11,6 @@ class CompiledFile():
 	def __str__(self):
 		return f'{self.name} ctime={self.ctime}, rtime={self.rtime} deps={self.dependencies} deadline={self.deadline} points={self.points}'
 
-
 class Instance():
 	def __init__(self, files, targets, nservers):
 		self.files = files
@@ -20,6 +21,16 @@ class Instance():
 			print(self.files[f])
 		print(self.targets)
 		print(self.nservers)
+
+	def plot_points_distribution(self):
+		points = [self.files[t_name].points for t_name in self.targets]
+		plt.hist (points)
+		plt.show ()
+
+	def plot_deadlines_distribution(self):
+		points = [self.files[t_name].deadline for t_name in self.targets]
+		plt.hist (points)
+		plt.show ()
 
 
 def loadInstance(filename):
@@ -49,3 +60,15 @@ def loadInstance(filename):
 			files[name].points = int(points)
 			targets.append(name)
 		return Instance(files, targets, nservers)
+
+class SubInstance ():
+	def __init__(self, files, target, nservers):
+		self.files = files
+		self.target = target
+		self.nservers = nservers
+
+	def log(self):
+		for f in self.files:
+			print(self.files[f])
+		print(self.targets)
+		print(self.nservers)
