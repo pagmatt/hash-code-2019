@@ -82,15 +82,25 @@ def solve_sub_instance (sub_instance: SubInstance):
                 model += t[k][i] >= t[j][i] + sub_instance.files[j].ctime - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
 
     model.objective = z
-    status = model.optimize(max_seconds_same_incumbent=20)
+    status = model.optimize(max_seconds_same_incumbent=30)
 
-    #assert (status == OptimizationStatus.OPTIMAL)
+    assert (status == OptimizationStatus.OPTIMAL or 
+            status == OptimizationStatus.FEASIBLE)
     print("Completion time: ", z.x)
     for (j, i) in product(range(f), range(s)):
         if (x[j][i].x >= 0.99):
             print("compilation %d starts on server %d at time %g " % (j+1, i+1, t[j][i].x))
 
-    return Solution ()
+    from matplotlib import pyplot as plt
+
+    # plot a sketch of the subproblem result
+    # fig, ax = plt.subplots()
+    # for (j, i) in product(range(f), range(s)):
+    #     if (x[j][i].x >= 0.99):
+    #         ax.barh(i, width=sub_instance.files[j].ctime, left=t[j][i].x)
+    # plt.show()
+
+    return Solution (sub_instance.nservers)
 
 def rec_load_dependencies(instance: Instance, file: CompiledFile):
     dependencies = []
@@ -118,13 +128,7 @@ def solve_instance(instance: Instance):
 
 if __name__ == '__main__':
 
-    # from matplotlib import pyplot as plt
 
-    # # plot a sketch of the subproblem result
-    # fig, ax = plt.subplots()
-    # for (j, i) in product(range(f), range(s)):
-    #     if (x[j][i].x >= 0.99):
-    #         ax.barh(i, width=c[j], left=t[j][i].x)
 
     # plt.show ()
     print('nope')
