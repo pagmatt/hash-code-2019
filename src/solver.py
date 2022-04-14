@@ -76,6 +76,9 @@ def optimally_solve_sub_instance (sub_instance: SubInstance):
             for i in range(s):
                 model += t[k][i] >= t[j][i] + sub_instance.filesList[j].ctime - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
 
+    # set initial feasible solution to speedup the B&C algorithm
+    model.start =  [(x[k-1][k], 1.0) for k in range(f)]
+
     model.objective = z
     status = model.optimize(max_seconds_same_incumbent=30)  # set a worst-case limit to the solver runtime
 
@@ -149,8 +152,8 @@ def solve_instance(instance: Instance):
 
         sub_problem = SubInstance(relevant_files_list, relevant_files_dict, target, instance.nservers)
         heuristic_solution = heuristically_solve_sub_instance(sub_problem)
-        #if (N_FILES_THRESHOLD < N_FILES_THRESHOLD):  
-        #    len(relevant_files_list)(sub_problem)
+        if (len(relevant_files_list) < N_FILES_THRESHOLD):  
+            optimally_solve_sub_instance(sub_problem)
 
 if __name__ == '__main__':
 
