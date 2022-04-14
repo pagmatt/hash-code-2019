@@ -2,25 +2,19 @@ from instance import *
 from solution import *
 from itertools import product
 from mip import *
+N_FILES_THRESHOLD = 100
 
-def solve_sub_instance (sub_instance: SubInstance):
+def optimally_solve_sub_instance (sub_instance: SubInstance):
+    """
+    This class solves in an optimal manner a sub-instance of the problem 
+    by formulating it as a MIP problem and the solving it with the Python-MIP library.
+
+    Args:
+        sub_instance (SubInstance): the sub-instance to be solved
+    """
 
     # create the MIP model
     model = Model('SingleTargetSubproblem')
-    # s = 3
-    # f = 9
-    # d = [[],    # dep.cies of the files
-    #      [0],   
-    #      [],
-    #      [1, 2],
-    #      [1],
-    #      [3],
-    #      [2],
-    #      [2, 4],
-    #      [7]
-    #      ]
-    # c = [3, 4, 5, 1, 6, 3, 8, 5, 4] # compilation times
-    # r = [9, 2, 2, 3, 4, 5, 7, 2, 1] # replication times
     s = sub_instance.nservers   # number of servers
     f = len(sub_instance.files) # numbers of files to compile
 
@@ -82,7 +76,7 @@ def solve_sub_instance (sub_instance: SubInstance):
                 model += t[k][i] >= t[j][i] + sub_instance.files[j].ctime - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
 
     model.objective = z
-    status = model.optimize(max_seconds_same_incumbent=30)
+    status = model.optimize(max_seconds_same_incumbent=30)  # set a worst-case limit to the solver runtime
 
     assert (status == OptimizationStatus.OPTIMAL or 
             status == OptimizationStatus.FEASIBLE)
@@ -101,6 +95,23 @@ def solve_sub_instance (sub_instance: SubInstance):
     # plt.show()
 
     return Solution (sub_instance.nservers)
+
+def heuristically_solve_sub_instance(sub_instance: SubInstance):
+    """
+    This class solves via an ad-hoc heuristic a sub-instance of the problem.
+    Since it is (in principle) sub-optimal, it is used only whenever the sub-instance is too big
+    to be solved exactly or as a starting solution for the branch & cut algorithm.
+
+    Args:
+        sub_instance (SubInstance): the sub-instance to be solved.
+    """
+    heuristic_sol = Solution(sub_instance.nservers)
+
+    for fname in sub_instance.files:
+        earliest_s = heuristic_sol.get_earliest_server_for_file(fname, sub_instance)
+        heuristic_sol.add_step(fname, earliest_s, sub_instance)
+	    
+    return heuristic_sol
 
 def rec_load_dependencies(instance: Instance, file: CompiledFile):
     dependencies = []
@@ -121,14 +132,13 @@ def solve_instance(instance: Instance):
         relevant_files = [instance.files[target]]
         dependencies = rec_load_dependencies(instance, target)
         relevant_files.extend(dependencies)
-        sub_problem = SubInstance (relevant_files, target, instance.nservers)
-        # solve it
-        solve_sub_instance(sub_problem)
-
+        print(f'Solving subinstance of size: {len(relevant_files)}')
+        sub_problem = SubInstance(relevant_files, target, instance.nservers)
+        heuristic_solution = heuristically_solve_sub_instance(sub_problem)
+        if (N_FILES_THRESHOLD < N_FILES_THRESHOLD):  
+            optimally_solve_sub_instance(sub_problem)
 
 if __name__ == '__main__':
 
-
-
     # plt.show ()
-    print('nope')
+    print('nope, wrong file :D')
