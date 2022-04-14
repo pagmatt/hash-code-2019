@@ -74,9 +74,9 @@ class Solution():
 		return score
 	
 	def add_step(self, fname: str, server: int, instance: SubInstance):
-		assert(fname in instance.files[fname])
+		assert(fname in instance.filesDict.keys())
 		max_aval_time = 0			
-		for dep in instance.files[fname]:			# make sure the dependencies are available
+		for dep in instance.filesDict[fname].dependencies:			# make sure the dependencies are available
 			assert(dep in self.files[server])
 			max_aval_time = max(max_aval_time, self.files[server][dep])
 
@@ -84,28 +84,27 @@ class Solution():
 		sched_time = max(max_aval_time, self.time[server])
 		for otherS in range(instance.nservers):
 			if otherS != server:
-				self.files[otherS][fname] = sched_time + instance.files[fname].ctime + \
-												instance.files[fname].rtime
+				self.files[otherS][fname] = sched_time + instance.filesDict[fname].ctime + \
+												instance.filesDict[fname].rtime
 			else:
-				self.files[otherS][fname] = sched_time + instance.files[fname].ctime
-		self.time[server] = sched_time + instance.files[fname].ctime
+				self.files[otherS][fname] = sched_time + instance.filesDict[fname].ctime
+		self.time[server] = sched_time + instance.filesDict[fname].ctime
 	
 	def get_earliest_server_for_file(self, fname: str, instance: SubInstance):
-		assert(fname in instance.files[fname])
+		assert(fname in instance.filesDict.keys())
 
 		# should have scheduled all dependencies already
 		earliest_server = -1
 		earliest_time = sys.maxsize
 		for s in range(self.nservers):
 			s_time = 0
-			for dep in instance.files[fname]:
+			for dep in instance.filesDict[fname].dependencies:
 				assert(dep in self.files[s])
-				s_time = max(earliest_time, self.files[s][dep])
+				s_time = max(s_time, self.files[s][dep])
 			
 			if (s_time < earliest_time):
 				earliest_time = s_time
 				earliest_server = s
-
 		assert(earliest_server !=  -1)
 		return earliest_server
 

@@ -1,3 +1,4 @@
+from turtle import right
 from instance import * 
 from solution import *
 from itertools import product
@@ -16,7 +17,7 @@ def optimally_solve_sub_instance (sub_instance: SubInstance):
     # create the MIP model
     model = Model('SingleTargetSubproblem')
     s = sub_instance.nservers   # number of servers
-    f = len(sub_instance.files) # numbers of files to compile
+    f = len(sub_instance.filesList) # numbers of files to compile
 
     # dummy variable representing the compilation time of the target
     z = model.add_var(name="z")
@@ -30,8 +31,8 @@ def optimally_solve_sub_instance (sub_instance: SubInstance):
     y = [[[model.add_var(var_type=BINARY, name='y({},{},{})'.format(i+1, j+1, k+1))
         for k in range(s)] for j in range(f)] for i in range(f)] 
     
-    bigM = 1.5 * (sum ([file.ctime for file in sub_instance.files]) 
-                + sum ([file.rtime for file in sub_instance.files]))
+    bigM = 1.5 * (sum ([file.ctime for file in sub_instance.filesList]) 
+                + sum ([file.rtime for file in sub_instance.filesList]))
 
     # constraints to try and reduce the computational load
     model += z <= sub_instance.get_deadline()
@@ -67,13 +68,13 @@ def optimally_solve_sub_instance (sub_instance: SubInstance):
     for (j, k) in product(range(f), range(f)):
         if (j != k):
             for i in range(s):
-                model += t[j][i] >= t[k][i] + sub_instance.files[k].ctime - bigM*(3 - x[j][i] - x[k][i] - (1 - y[j][k][i]))
+                model += t[j][i] >= t[k][i] + sub_instance.filesList[k].ctime - bigM*(3 - x[j][i] - x[k][i] - (1 - y[j][k][i]))
 
     # non-concurrent compilation, case t_{f, s} < t_{f, s'}
     for (j, k) in product(range(f), range(f)):
         if (j != k):
             for i in range(s):
-                model += t[k][i] >= t[j][i] + sub_instance.files[j].ctime - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
+                model += t[k][i] >= t[j][i] + sub_instance.filesList[j].ctime - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
 
     model.objective = z
     status = model.optimize(max_seconds_same_incumbent=30)  # set a worst-case limit to the solver runtime
@@ -107,9 +108,18 @@ def heuristically_solve_sub_instance(sub_instance: SubInstance):
     """
     heuristic_sol = Solution(sub_instance.nservers)
 
-    for fname in sub_instance.files:
-        earliest_s = heuristic_sol.get_earliest_server_for_file(fname, sub_instance)
-        heuristic_sol.add_step(fname, earliest_s, sub_instance)
+    for file in reversed(sub_instance.filesList):
+        earliest_s = heuristic_sol.get_earliest_server_for_file(file.name, sub_instance)
+        heuristic_sol.add_step(file.name, earliest_s, sub_instance)
+
+    from matplotlib import pyplot as plt
+
+    #plot a sketch of the subproblem result
+    fig, ax = plt.subplots()
+    for s in range(heuristic_sol.nservers):
+        for f in heuristic_sol.files[s].keys():
+            ax.barh(s, width=sub_instance.filesDict[f].ctime, left=heuristic_sol.files[s][f] - sub_instance.filesDict[f].ctime)
+    plt.show()
 	    
     return heuristic_sol
 
@@ -129,14 +139,18 @@ def solve_instance(instance: Instance):
         assert(target in instance.files)
 
         # create sub-problem
-        relevant_files = [instance.files[target]]
+        relevant_files_list = [instance.files[target]]
         dependencies = rec_load_dependencies(instance, target)
-        relevant_files.extend(dependencies)
-        print(f'Solving subinstance of size: {len(relevant_files)}')
-        sub_problem = SubInstance(relevant_files, target, instance.nservers)
+        relevant_files_list.extend(dependencies)
+        relevant_files_dict = {}
+        for file in relevant_files_list:
+            relevant_files_dict[file.name] = file
+        print(f'Solving subinstance of size: {len(relevant_files_list)}')
+
+        sub_problem = SubInstance(relevant_files_list, relevant_files_dict, target, instance.nservers)
         heuristic_solution = heuristically_solve_sub_instance(sub_problem)
-        if (N_FILES_THRESHOLD < N_FILES_THRESHOLD):  
-            optimally_solve_sub_instance(sub_problem)
+        #if (N_FILES_THRESHOLD < N_FILES_THRESHOLD):  
+        #    len(relevant_files_list)(sub_problem)
 
 if __name__ == '__main__':
 

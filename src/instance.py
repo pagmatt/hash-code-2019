@@ -62,14 +62,15 @@ def loadInstance(filename):
 		return Instance(files, targets, nservers)
 
 class SubInstance ():
-	def __init__(self, files: list[CompiledFile], target: list, nservers):
-		self.files = files
+	def __init__(self, filesList: list[CompiledFile], filesDict: dict, target: list, nservers):
+		self.filesList = filesList
+		self.filesDict = filesDict
 		self.target = target
 		self.nservers = nservers
 
 	def log(self):
 		print('Files:')
-		for f in self.files:
+		for f in self.filesList:
 			print(f)
 		print('Target:')
 		print(self.target)
@@ -78,10 +79,9 @@ class SubInstance ():
 
 	def get_times_and_idx(self, fname):
 		for idx in range(len(self.files)):
-			if self.files[idx].name == fname:
-				return [self.files[idx].ctime, self.files[idx].rtime, idx]
+			if self.filesList[idx].name == fname:
+				return [self.filesList[idx].ctime, self.filesList[idx].rtime, idx]
 
 	def get_deadline(self):
-		for file in self.files:
-			if file.name == self.target:
-				return file.deadline
+		assert(self.target in self.filesDict.keys())
+		return self.filesDict[self.target].deadline
