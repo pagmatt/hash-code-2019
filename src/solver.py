@@ -1,5 +1,4 @@
-from numpy import s_
-from pyparsing import dblQuotedString
+import copy
 from instance import * 
 from solution import *
 from itertools import product, chain
@@ -145,6 +144,7 @@ def merge_sub_instances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: Su
             == sol_a.nservers == sol_b.nservers)
     s = sub_inst_a.nservers
     tf = sub_inst_b.filesDict[sub_inst_b.target]
+    sol_a_old = copy.deepcopy(sol_a)
     new_f = []
 
     for sched_file in sol_b.filesCompTime:
@@ -155,9 +155,9 @@ def merge_sub_instances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: Su
             new_f.append(sched_file.fname)
 
     # did we manage to compile the target in time? if not, remove the new compilations
-    
-
-    #TODO: remove if can not meet deadline
+    t_aval_time = min([sol_a.filesAvailTime[i][tf.name] for i in range(s)])
+    if (t_aval_time > sub_inst_b.get_deadline()):
+        sol_a = sol_a_old
 
     return sol_a
 
