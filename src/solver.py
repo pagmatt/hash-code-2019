@@ -1,11 +1,11 @@
-from turtle import right
+from numpy import s_
 from instance import * 
 from solution import *
-from itertools import product
+from itertools import product, chain
 from mip import *
 N_FILES_THRESHOLD = 100
 
-def optimally_solve_sub_instance (sub_instance: SubInstance):
+def optimally_solve_sub_instance (sub_instance: SubInstance, init_solution: Solution = None):
     """
     This class solves in an optimal manner a sub-instance of the problem 
     by formulating it as a MIP problem and the solving it with the Python-MIP library.
@@ -45,15 +45,15 @@ def optimally_solve_sub_instance (sub_instance: SubInstance):
 
     # dependency constraint on same server
     for j in range(f):
-        deps = sub_instance.files[j].dependencies
+        deps = sub_instance.filesList[j].dependencies
         for dep in deps:
             for i in range(s):
-                ctime, rtime, idx = sub_instance.get_times_and_idx (dep)
+                ctime, _, idx = sub_instance.get_times_and_idx (dep)
                 model += t[j][i] >= t[idx][i] + ctime - bigM*(2 - x[j][i] - x[idx][i])
 
     # dependency constraint on different server 
     for j in range(f):
-        deps = sub_instance.files[j].dependencies
+        deps = sub_instance.filesList[j].dependencies
         for dep in deps:
             for (i, k) in product(range(s), range(s)):
                 if (i != k): # if different servers
@@ -64,23 +64,44 @@ def optimally_solve_sub_instance (sub_instance: SubInstance):
     for i in range (f):
         model += xsum(x[i][j] for j in range(s)) >= 1
 
-    # non-concurrent compilation, case t_{f, s} >= t_{f, s'}
+    # non-concurrent compilation, case t_{f, s} >= t_{f', s}
     for (j, k) in product(range(f), range(f)):
         if (j != k):
             for i in range(s):
                 model += t[j][i] >= t[k][i] + sub_instance.filesList[k].ctime - bigM*(3 - x[j][i] - x[k][i] - (1 - y[j][k][i]))
 
-    # non-concurrent compilation, case t_{f, s} < t_{f, s'}
+    # non-concurrent compilation, case t_{f, s} < t_{f', s}
     for (j, k) in product(range(f), range(f)):
         if (j != k):
             for i in range(s):
                 model += t[k][i] >= t[j][i] + sub_instance.filesList[j].ctime - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
 
-    # set initial feasible solution to speedup the B&C algorithm
-    model.start =  [(x[k-1][k], 1.0) for k in range(f)]
+    if(init_solution is not None):
+        # set initial feasible solution to speedup the B&C algorithm
+        x_start = [[0] * f for _ in range(s)]
+        t_start = [[0] * f for _ in range(s)]
+        y_start = [[[0] * f for _ in range(f)] for _ in range(s)]
+
+        # set values for x variables
+        for s_idx in range(s):
+            for step in init_solution.steps[s_idx]:
+                _, _, f_idx = sub_instance.get_times_and_idx(step)
+                x_start[s_idx][f_idx] = 1
+                t_start[s_idx][f_idx] = init_solution.files[s_idx][step]
+        
+            for (i, j) in product(range(f), range(f)):
+                if (i != j):
+                    cond = t_start[s_idx][i] > t_start[s_idx][j]
+                    y_start[s_idx][i][j] = int(cond)
+        
+        print(f'providing {len(list(chain(*x_start))) + len(list(chain(*y_start)))} initial fractional variables')
+
+        model.start = [(x[k][j], x_start[j][k]) for (j, k) in product(range(s), range(f))]
+        model.start = [(y[l][k][j], y_start[j][k][l]) for (j, k, l) in product(range(s), range(f), range(f))]
+        #model.start = [[(t[k][j], t_start[j][k]) for j in range(s)] for k in range(f)]
 
     model.objective = z
-    status = model.optimize(max_seconds_same_incumbent=30)  # set a worst-case limit to the solver runtime
+    status = model.optimize(max_seconds_same_incumbent=10, max_seconds=20)  # set a worst-case limit to the solver runtime
 
     assert (status == OptimizationStatus.OPTIMAL or 
             status == OptimizationStatus.FEASIBLE)
@@ -120,8 +141,9 @@ def heuristically_solve_sub_instance(sub_instance: SubInstance):
     #plot a sketch of the subproblem result
     fig, ax = plt.subplots()
     for s in range(heuristic_sol.nservers):
-        for f in heuristic_sol.files[s].keys():
-            ax.barh(s, width=sub_instance.filesDict[f].ctime, left=heuristic_sol.files[s][f] - sub_instance.filesDict[f].ctime)
+        for fname in heuristic_sol.steps[s]:
+            ax.barh(s, width=sub_instance.filesDict[fname].ctime, 
+                        left=heuristic_sol.files[s][fname] - sub_instance.filesDict[fname].ctime)
     plt.show()
 	    
     return heuristic_sol
@@ -148,14 +170,9 @@ def solve_instance(instance: Instance):
         relevant_files_dict = {}
         for file in relevant_files_list:
             relevant_files_dict[file.name] = file
-        print(f'Solving subinstance of size: {len(relevant_files_list)}')
+        print(f'Solving subinstance of size: {len(relevant_files_list)} and nservers: {instance.nservers}')
 
         sub_problem = SubInstance(relevant_files_list, relevant_files_dict, target, instance.nservers)
         heuristic_solution = heuristically_solve_sub_instance(sub_problem)
         if (len(relevant_files_list) < N_FILES_THRESHOLD):  
-            optimally_solve_sub_instance(sub_problem)
-
-if __name__ == '__main__':
-
-    # plt.show ()
-    print('nope, wrong file :D')
+            optimally_solve_sub_instance(sub_problem, heuristic_solution)

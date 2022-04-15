@@ -6,9 +6,8 @@ class Solution():
 	def __init__(self, nservers):
 		self.nservers = nservers
 		self.steps = [[] for s in range(self.nservers)]
-		self.files = [{} for s in range(self.nservers)]
+		self.files = [{} for s in range(self.nservers)]	# times when files are ready at each server 
 		self.time = [0 for s in range(self.nservers)]	# current time at each server
-		self.files = [{} for s in range(self.nservers)] # files ready at each server (with corresponding time)
 
 	def log(self):
 		for s in range(self.nservers):
@@ -89,6 +88,7 @@ class Solution():
 			else:
 				self.files[otherS][fname] = sched_time + instance.filesDict[fname].ctime
 		self.time[server] = sched_time + instance.filesDict[fname].ctime
+		self.steps[server].append(fname)
 	
 	def get_earliest_server_for_file(self, fname: str, instance: SubInstance):
 		assert(fname in instance.filesDict.keys())
@@ -101,6 +101,7 @@ class Solution():
 			for dep in instance.filesDict[fname].dependencies:
 				assert(dep in self.files[s])
 				s_time = max(s_time, self.files[s][dep])
+			s_time = max(s_time, self.time[s])
 			
 			if (s_time < earliest_time):
 				earliest_time = s_time

@@ -78,7 +78,7 @@ class SubInstance ():
 		print(self.nservers)
 
 	def get_times_and_idx(self, fname):
-		for idx in range(len(self.files)):
+		for idx in range(len(self.filesList)):
 			if self.filesList[idx].name == fname:
 				return [self.filesList[idx].ctime, self.filesList[idx].rtime, idx]
 
