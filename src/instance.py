@@ -85,3 +85,7 @@ class SubInstance ():
 	def get_deadline(self):
 		assert(self.target in self.filesDict.keys())
 		return self.filesDict[self.target].deadline
+
+	def get_compil_points(self):
+		assert(self.target in self.filesDict.keys())
+		return self.filesDict[self.target].points

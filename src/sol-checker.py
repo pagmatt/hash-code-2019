@@ -24,8 +24,8 @@ if __name__ == '__main__':
 
 			#fn_sol = fn.replace ('.in', '.out')
 			#solution = loadSolution(f'{solution_path}{fn_sol}', instance)
-			instance_score = solution.evalCheck(instance)
+			#instance_score = solution.evalCheck(instance)
 			#print(f'Score = "{instance_score}')
-			overall_score = overall_score + instance_score
+			#overall_score = overall_score + instance_score
 
 	print(f'Overall score = {overall_score}')

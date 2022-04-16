@@ -3,7 +3,11 @@ from instance import *
 from solution import *
 from itertools import product, chain
 from mip import *
+from progress import *
+
 N_FILES_THRESHOLD = 0
+MAX_SEC_OVERALL = 50 # secods
+MAX_SEC_SAME_INCUMBENT = 20 # seconds
 
 def optimally_solve_sub_instance (sub_instance: SubInstance, init_solution: Solution = None):
     """
@@ -28,8 +32,8 @@ def optimally_solve_sub_instance (sub_instance: SubInstance, init_solution: Solu
     t = [[model.add_var(name='t({},{})'.format(j+1, i+1))
         for i in range(s)] for j in range(f)]
     # dummy variable representing whether t_{f, s} < t_{f', s}
-    y = [[[model.add_var(var_type=BINARY, name='y({},{},{})'.format(i+1, j+1, k+1))
-        for k in range(s)] for j in range(f)] for i in range(f)] 
+    y = [[model.add_var(var_type=BINARY, name='y({},{})'.format(i+1, j+1)) 
+        for j in range(f)] for i in range(f)] 
     
     bigM = 1.5 * (sum ([file.ctime for file in sub_instance.filesList]) 
                 + sum ([file.rtime for file in sub_instance.filesList]))
@@ -68,19 +72,19 @@ def optimally_solve_sub_instance (sub_instance: SubInstance, init_solution: Solu
     for (j, k) in product(range(f), range(f)):
         if (j != k):
             for i in range(s):
-                model += t[j][i] >= t[k][i] + sub_instance.filesList[k].ctime - bigM*(3 - x[j][i] - x[k][i] - (1 - y[j][k][i]))
+                model += t[j][i] >= t[k][i] + sub_instance.filesList[k].ctime - bigM*(3 - x[j][i] - x[k][i] - (1 - y[j][k]))
 
     # non-concurrent compilation, case t_{f, s} < t_{f', s}
     for (j, k) in product(range(f), range(f)):
         if (j != k):    
             for i in range(s):
-                model += t[k][i] >= t[j][i] + sub_instance.filesList[j].ctime - bigM*(3 - x[j][i] - x[k][i] - y[j][k][i])
+                model += t[k][i] >= t[j][i] + sub_instance.filesList[j].ctime - bigM*(3 - x[j][i] - x[k][i] - y[j][k])
 
     if(init_solution is not None):
         # set initial feasible solution to speedup the B&C algorithm
         x_start = [[0] * f for _ in range(s)]
         t_start = [[0] * f for _ in range(s)]
-        y_start = [[[0] * f for _ in range(f)] for _ in range(s)]
+        y_start = [[0] * f for _ in range(f)]
 
         # set values for x variables
         for s_idx in range(s):
@@ -92,34 +96,34 @@ def optimally_solve_sub_instance (sub_instance: SubInstance, init_solution: Solu
             for (i, j) in product(range(f), range(f)):
                 if (i != j and x_start[s_idx][i] == 1 and x_start[s_idx][j] == 1):
                     cond = t_start[s_idx][i] > t_start[s_idx][j]
-                    y_start[s_idx][i][j] = int(cond)
+                    y_start[i][j] = int(cond)
         
-        #model.start = [(x[k][j], x_start[j][k]) for (j, k) in product(range(s), range(f))]
         x_start_vars = [(x[k][j], x_start[j][k]) for (j, k) in product(range(s), range(f))]
-        y_start_vars = [(y[l][k][j], y_start[j][k][l]) for (j, k, l) in product(range(s), range(f), range(f))]
+        y_start_vars = [(y[k][j], y_start[j][k]) for (j, k) in product(range(f), range(f))]
         model.start = x_start_vars + y_start_vars
-        #model.start = [[(t[k][j], t_start[j][k]) for j in range(s)] for k in range(f)]
-
+    
+    model.verbose = 0
     model.objective = z
-    status = model.optimize(max_seconds_same_incumbent=10, max_seconds=50)  # set a worst-case limit to the solver runtime
+    status = model.optimize(max_seconds_same_incumbent=MAX_SEC_SAME_INCUMBENT, max_seconds=MAX_SEC_OVERALL)  # set a worst-case limit to the solver runtime
+    found = False
+    obj = 0
 
     if (status == OptimizationStatus.OPTIMAL or 
             status == OptimizationStatus.FEASIBLE):
-        print("Completion time: ", z.x)
-        for (j, i) in product(range(f), range(s)):
-            if (x[j][i].x >= 0.99):
-                print("compilation %d starts on server %d at time %g " % (j+1, i+1, t[j][i].x))
+        found = True
+        obj = int(z.x)
 
-        # from matplotlib import pyplot as plt
 
-        # #plot a sketch of the subproblem result
-        # fig, ax = plt.subplots()
+        # output the solution
+        # solution = Solution(s)
+
         # for (j, i) in product(range(f), range(s)):
         #     if (x[j][i].x >= 0.99):
-        #         ax.barh(i, width=sub_instance.filesList[j].ctime, left=t[j][i].x)
-        # plt.show()
+        #         print("compilation %d starts on server %d at time %g " % (j+1, i+1, t[j][i].x))
 
-    return Solution (sub_instance.nservers)
+        # build a solution from the results of the solvers
+
+    return [found, obj]
 
 def heuristically_solve_sub_instance(sub_instance: SubInstance):
     """
@@ -135,6 +139,15 @@ def heuristically_solve_sub_instance(sub_instance: SubInstance):
     for file in reversed(sub_instance.filesList):
         earliest_s = heuristic_sol.get_earliest_server_for_file(file.name, sub_instance)
         heuristic_sol.add_step(file.name, earliest_s, sub_instance)
+
+    from matplotlib import pyplot as plt
+
+    #plot a sketch of the subproblem result
+    # fig, ax = plt.subplots()
+    # for s in range(heuristic_sol.nservers):
+    #     for f in heuristic_sol.compSteps[s]:
+    #         ax.barh(s, width=sub_instance.filesDict[f].ctime, left=heuristic_sol.filesAvailTime[s][f] - sub_instance.filesDict[f].ctime)
+    # plt.show()
 	    
     return heuristic_sol
 
@@ -172,11 +185,18 @@ def rec_load_dependencies(instance: Instance, file: CompiledFile):
 
 def solve_instance(instance: Instance):
     # solve sub-instances
-    solution = Solution(instance.nservers)
-    prevInst = None
+    num_targets = len(instance.targets)
+    sub_sol, sub_inst = [], []
+    scores = [0] * num_targets
+    progress(0, num_targets, '')
+    counter = 0
+    delta = []
 
     for target in instance.targets:
+        
         assert(target in instance.files)
+
+        progress(counter, num_targets)
 
         # create sub-problem
         relevant_files_list = [instance.files[target]]
@@ -190,12 +210,30 @@ def solve_instance(instance: Instance):
         sub_problem = SubInstance(relevant_files_list, relevant_files_dict, target, instance.nservers)
         heuristic_solution = heuristically_solve_sub_instance(sub_problem)
         #if (len(relevant_files_list) < N_FILES_THRESHOLD):  
-        #    optimally_solve_sub_instance(sub_problem, heuristic_solution)
+        [found, obj] = optimally_solve_sub_instance(sub_problem, heuristic_solution)
+        if found:
+            tf = sub_problem.target
+            t_aval_time = min([heuristic_solution.filesAvailTime[j][tf] for j in range(sub_problem.nservers)])
+            delta.append(t_aval_time - obj)
+        else: 
+            delta.append(0)
 
-        if(prevInst != None):
-            solution = merge_sub_instances(prevInst, solution, sub_problem, heuristic_solution)
-        else:
-            solution = heuristic_solution
-        prevInst = sub_problem
+        sub_inst.append(sub_problem)
+        sub_sol.append(heuristic_solution)
+        counter = counter + 1
 
-    return solution
+    # sort the targets
+    progress(counter, num_targets, 'Merging subinstances')
+    assert(len(sub_sol) == len(sub_inst) == len(scores))
+    for i in range(len(sub_sol)):
+        tf = sub_inst[i].target
+        s = sub_inst[i].nservers
+        t_aval_time = min([sub_sol[i].filesAvailTime[j][tf] for j in range(s)])
+        deadline = sub_inst[i].get_deadline()
+        if (t_aval_time <= deadline):
+            scores[i] = deadline - t_aval_time + sub_inst[i].get_compil_points()
+    
+    print(delta)
+    print(scores)
+
+    return 1
