@@ -9,7 +9,7 @@ class CompiledFile():
 		self.deadline = -1
 		self.points = 0
 	def __str__(self):
-		return f'{self.name} ctime={self.ctime}, rtime={self.rtime} deps={self.dependencies} deadline={self.deadline} points={self.points}'
+		return f'{self.name} ctime={self.ctime}, rtime={self.rtime}, deps={self.dependencies}, deadline={self.deadline}, points={self.points}'
 
 class Instance():
 	def __init__(self, files, targets, nservers):

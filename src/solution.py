@@ -3,9 +3,10 @@ from instance import *
 import sys
 
 class SchedFile():
-	def __init__(self, fname: str, sched_time: int):
+	def __init__(self, fname: str, sched_time: int, server: int):
 		self.fname = fname
 		self.sched_time = sched_time
+		self.server = server
 class Solution():
 	def __init__(self, nservers):
 		self.nservers = nservers
@@ -13,6 +14,7 @@ class Solution():
 		self.filesAvailTime = [{} for s in range(self.nservers)]	# times when files are ready at each server 
 		self.filesCompTime = []
 		self.currTime = [0 for s in range(self.nservers)]	# current time at each server
+		self.occupancy = [0 for s in range(self.nservers)]	# the amount of time during which the server is occupied
 
 	def log(self):
 		for s in range(self.nservers):
@@ -80,28 +82,42 @@ class Solution():
 	
 	def add_step(self, fname: str, server: int, instance: SubInstance):
 		assert(fname in instance.filesDict.keys())
-		max_aval_time = 0			
+		avail_time, s_time = 0, 0		
 		for dep in instance.filesDict[fname].dependencies:			# make sure the dependencies are available
 			assert(dep in self.filesAvailTime[server])
-			max_aval_time = max(max_aval_time, self.filesAvailTime[server][dep])
+			avail_time = max(avail_time, self.filesAvailTime[server][dep])
 
-		# schedule this compilation
-		sched_time = max(max_aval_time, self.currTime[server])
+		for step in self.compSteps[server]:
+			if self.getSchedTime(step, server) > s_time + instance.filesDict[fname].ctime and \
+				s_time >= avail_time:
+				# can sched here
+				break;
+			else:
+				s_time = self.filesAvailTime[server][step]
+		
+		s_time = max(s_time, avail_time)
+
+		# schedule file twice if it makes sense to do so
+		#while(avail_time > min(self.currTime)):
+		
+
 		for otherS in range(instance.nservers):
 			if otherS != server:
-				self.filesAvailTime[otherS][fname] = sched_time + instance.filesDict[fname].ctime + \
+				self.filesAvailTime[otherS][fname] = s_time + instance.filesDict[fname].ctime + \
 												instance.filesDict[fname].rtime
 			else:
-				self.filesAvailTime[otherS][fname] = sched_time + instance.filesDict[fname].ctime
-		self.currTime[server] = sched_time + instance.filesDict[fname].ctime
+				self.filesAvailTime[otherS][fname] = s_time + instance.filesDict[fname].ctime		
+		self.currTime[server] = max(s_time + instance.filesDict[fname].ctime, self.currTime[server])
 		self.compSteps[server].append(fname)
+		self.occupancy[server] = self.occupancy[server] + instance.filesDict[fname].ctime
 		idx = 0
 		while(idx < len(self.filesCompTime)):
-			if (self.filesCompTime[idx].sched_time < sched_time):
+			if (self.filesCompTime[idx].sched_time < s_time):
 				idx = idx + 1
 			else:
 				break
-		self.filesCompTime.insert(idx, SchedFile(fname, sched_time))
+		self.filesCompTime.insert(idx, SchedFile(fname, s_time, server))
+
 	
 	def get_earliest_server_for_file(self, fname: str, instance: SubInstance):
 		assert(fname in instance.filesDict.keys())
@@ -110,17 +126,42 @@ class Solution():
 		earliest_server = -1
 		earliest_time = sys.maxsize
 		for s in range(self.nservers):
-			s_time = 0
+			s_time, avail_time = 0, 0
+
 			for dep in instance.filesDict[fname].dependencies:
 				assert(dep in self.filesAvailTime[s])
-				s_time = max(s_time, self.filesAvailTime[s][dep])
-			s_time = max(s_time, self.currTime[s])
-			
+				avail_time = max(avail_time, self.filesAvailTime[s][dep])
+
+			for step in self.compSteps[s]:
+				if self.getSchedTime(step, s) > s_time + instance.filesDict[fname].ctime and \
+					s_time >= avail_time:
+					# can sched here
+					break;
+				else:
+					s_time = self.filesAvailTime[s][step]
+
+			s_time = max(s_time, avail_time)
+				
 			if (s_time < earliest_time):
 				earliest_time = s_time
 				earliest_server = s
+
 		assert(earliest_server !=  -1)
 		return earliest_server
+	
+	def getLoad(self, server):
+		if self.occupancy[server] != 0:
+			return self.currTime[server] / self.occupancy[server]
+		else:
+			return 0
+
+	def getSchedTime(self, fname: str, server: int):
+		time = -1
+		for sched in self.filesCompTime:
+			if sched.fname == fname and sched.server == server:
+				time = sched.sched_time
+		assert(time != -1)
+		return time
 
 def loadSolution(fname: str, instance: Instance):
 	with open(fname) as fp:
