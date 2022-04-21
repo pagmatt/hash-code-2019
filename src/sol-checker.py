@@ -15,18 +15,14 @@ if __name__ == '__main__':
 		instances_fns = os.listdir(path)
 
 		for fn in instances_fns:
-			if 'typical' in fn:
-				print(f'Solving instance: {fn}')
-				instance = loadInstance(f'{path}{fn}')
-				solution = solve_instance (instance)
+			instance = loadInstance(f'{path}{fn}')
+			solution = solve_instance(instance)
 
-				#instance.plot_points_distribution()
-				#instance.plot_deadlines_distribution()
+			fn_sol = fn.replace('.in', '.out')
+			solution.printSolution(f'{solution_path}{fn_sol}')
+			solution_from_file = loadSolution(f'{solution_path}{fn_sol}', instance)
+			instance_score = solution_from_file.evalCheck(instance)
+			#print(f'Score = "{instance_score}')
+			overall_score = overall_score + instance_score
 
-				#fn_sol = fn.replace ('.in', '.out')
-				#solution = loadSolution(f'{solution_path}{fn_sol}', instance)
-				instance_score = solution.evalCheck(instance)
-				#print(f'Score = "{instance_score}')
-				overall_score = overall_score + instance_score
-
-	print(f'Overall score = {overall_score}')
+	print(f'\nOverall score = {overall_score}')

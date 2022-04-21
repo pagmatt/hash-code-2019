@@ -1,4 +1,5 @@
 from collections import deque
+import sched
 from instance import *
 import sys
 
@@ -9,22 +10,24 @@ class SchedFile():
 		self.server = server
 class Solution():
 	def __init__(self, nservers):
-		self.nservers = nservers
-		self.compSteps = [[] for s in range(self.nservers)]
+		self.nservers = nservers	
+		self.compSteps = [[] for s in range(self.nservers)]			# compilation steps performed at each server. Kept in chronological order
 		self.filesAvailTime = [{} for s in range(self.nservers)]	# times when files are ready at each server 
 		self.filesCompTime = []
-		self.currTime = [0 for s in range(self.nservers)]	# current time at each server
-		# self.occupancy = [0 for s in range(self.nservers)]	# the amount of time during which the server is occupied
+		self.currTime = [0 for s in range(self.nservers)]			# current time at each server ~ last instant during which a file is compiled
+		self.gaps = [False for s in range(self.nservers)]			# are there gaps between compilation in a given server ?
 
 	def log(self):
 		for s in range(self.nservers):
 			print(self.compSteps[s])
 
 	def evalCheck(self, instance):
-
+		# prevent side-effects
+		avail_times = [{} for s in range(self.nservers)]
 		times = [0 for s in range(self.nservers)]
 		# queue of compilation steps for each server
 		queues = [deque(self.compSteps[s]) for s in range(instance.nservers)]
+		
 		# simulate compilation
 		while(True):
 			nDone = 0
@@ -37,11 +40,11 @@ class Solution():
 				depOk = True
 				startTime = times[s]
 				for dep in cf.dependencies:
-					if dep not in self.filesAvailTime[s]:
+					if dep not in avail_times[s]:
 						depOk = False
 						break
 					else:
-						startTime = max(startTime, self.filesAvailTime[s][dep])
+						startTime = max(startTime, avail_times[s][dep])
 				if depOk:
 					#print(f'Execute {cf.name} on server {s} at time {startTime}-{startTime+cf.ctime}')
 					# remove it from queue
@@ -51,9 +54,9 @@ class Solution():
 					# mark f available (either compilation or replication)
 					for otherS in range(instance.nservers):
 						if otherS != s:
-							self.filesAvailTime[otherS][cf.name] = startTime + cf.ctime + cf.rtime
+							avail_times[otherS][cf.name] = startTime + cf.ctime + cf.rtime
 						else:
-							self.filesAvailTime[otherS][cf.name] = startTime + cf.ctime
+							avail_times[otherS][cf.name] = startTime + cf.ctime
 					times[s] = startTime + cf.ctime
 			if not nDone:
 				break
@@ -63,20 +66,17 @@ class Solution():
 		# merge files from all servers
 		targets = {}
 		for s in range(instance.nservers):
-			for f in self.filesAvailTime[s]:
+			for f in avail_times[s]:
 				if f in targets:
-					targets[f] = min(targets[f], self.filesAvailTime[s][f])
+					targets[f] = min(targets[f], avail_times[s][f])
 				else:
-					targets[f] = self.filesAvailTime[s][f]
+					targets[f] = avail_times[s][f]
 		# evaluate targets
 		score = 0
 		for t in targets:
 			cf = instance.files[t]
 			if (cf.points > 0) and (targets[t] <= cf.deadline):
 				score += (cf.deadline - targets[t]) + cf.points
-
-		# remove side-effects
-		self.filesAvailTime = [{} for s in range(self.nservers)]
 
 		return score
 	
@@ -87,15 +87,22 @@ class Solution():
 			assert(dep in self.filesAvailTime[server])
 			avail_time = max(avail_time, self.filesAvailTime[server][dep])
 
-		for step in self.compSteps[server]:
-			if self.getSchedTime(step, server) > s_time + instance.filesDict[fname].ctime and \
-				s_time >= avail_time:
-				# can sched here
-				break;
-			else:
-				s_time = self.filesAvailTime[server][step]
+		if self.gaps[server]:
+			for step in self.compSteps[server]:
+				if self.getSchedTime(step, server) > s_time + instance.filesDict[fname].ctime and \
+					s_time >= avail_time:
+					# can sched here
+					break;
+				else:
+					s_time = self.filesAvailTime[server][step]
+		else:
+			s_time = self.currTime[server]
 		
 		s_time = max(s_time, avail_time)
+
+		# are we creating a gap?
+		if s_time > self.currTime[server]:
+			self.gaps[server] = True
 
 		# schedule dependencies twice (on a different server) if it makes sense to do so
 		#while(avail_time > min(self.currTime)):
@@ -109,7 +116,6 @@ class Solution():
 				else:
 					self.filesAvailTime[otherS][fname] = s_time + instance.filesDict[fname].ctime		
 			self.currTime[server] = max(s_time + instance.filesDict[fname].ctime, self.currTime[server])
-			self.compSteps[server].append(fname)
 			# self.occupancy[server] = self.occupancy[server] + instance.filesDict[fname].ctime
 			idx = 0
 			while(idx < len(self.filesCompTime)):
@@ -118,6 +124,20 @@ class Solution():
 				else:
 					break
 			self.filesCompTime.insert(idx, SchedFile(fname, s_time, server))
+
+			# re-order comp steps if compiled in a gap. TODO: use insertion sort here as well
+			# idx = 0
+			# while(idx < len(self.compSteps[server])):
+			# 	if (self.compSteps[server].sched_time < s_time):
+			# 		idx = idx + 1
+			# 	else:
+			# 		break
+			# self.filesCompTime.insert(idx, SchedFile(fname, s_time, server))
+
+			self.compSteps[server] = []
+			for sched_file in self.filesCompTime: 
+				if sched_file.server == server:
+					self.compSteps[server].append(sched_file.fname)
 
 	
 	def get_earliest_server_for_file(self, fname: str, instance: SubInstance):
@@ -149,12 +169,6 @@ class Solution():
 
 		assert(earliest_server !=  -1)
 		return earliest_server
-	
-	# def getLoad(self, server):
-	# 	if self.occupancy[server] != 0:
-	# 		return self.currTime[server] / self.occupancy[server]
-	# 	else:
-	# 		return 0
 
 	def getSchedTime(self, fname: str, server: int):
 		time = -1
@@ -163,6 +177,14 @@ class Solution():
 				time = sched.sched_time
 		assert(time != -1)
 		return time
+
+	def printSolution(self, out_name: str):
+		with open(out_name, 'w+') as f:
+			print(len(self.filesCompTime), file=f)
+			for sched_file in self.filesCompTime:
+				print(f'{sched_file.fname} {sched_file.server}', file=f)
+
+			f.close()
 
 def loadSolution(fname: str, instance: Instance):
 	with open(fname) as fp:

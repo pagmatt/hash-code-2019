@@ -12,10 +12,11 @@ class CompiledFile():
 		return f'{self.name} ctime={self.ctime}, rtime={self.rtime}, deps={self.dependencies}, deadline={self.deadline}, points={self.points}'
 
 class Instance():
-	def __init__(self, files, targets, nservers):
+	def __init__(self, files, targets, nservers, name):
 		self.files = files
 		self.targets = targets
 		self.nservers = nservers
+		self.name = name
 	def log(self):
 		for f in self.files:
 			print(self.files[f])
@@ -59,7 +60,7 @@ def loadInstance(filename):
 			files[name].deadline = int(deadline)
 			files[name].points = int(points)
 			targets.append(name)
-		return Instance(files, targets, nservers)
+		return Instance(files, targets, nservers, filename)
 
 class SubInstance ():
 	def __init__(self, filesList: list[CompiledFile], filesDict: dict, target: list, nservers):

@@ -4,7 +4,6 @@ from solution import *
 from itertools import product, chain
 from mip import *
 from progress import *
-import numpy as np
 
 N_FILES_THRESHOLD = 1
 MAX_SEC_OVERALL = 50  # secods
@@ -153,17 +152,26 @@ def heuristically_solve_sub_instance(sub_instance: SubInstance):
 
     #plot a sketch of the subproblem result
 
-    from matplotlib import pyplot as plt
-    fig, ax = plt.subplots()
-    for s in range(heuristic_sol.nservers):
-        for f in heuristic_sol.compSteps[s]:
-            ax.barh(s, width=sub_instance.filesDict[f].ctime, left=heuristic_sol.filesAvailTime[s][f] - sub_instance.filesDict[f].ctime, alpha=0.5)
-    plt.show()
+    # from matplotlib import pyplot as plt
+    # fig, ax = plt.subplots()
+    # for s in range(heuristic_sol.nservers):
+    #     for f in heuristic_sol.compSteps[s]:
+    #         ax.barh(s, width=sub_instance.filesDict[f].ctime, left=heuristic_sol.filesAvailTime[s][f] - sub_instance.filesDict[f].ctime, alpha=0.5)
+    # plt.show()
 
     return heuristic_sol
 
 
 def merge_sub_instances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: SubInstance, sol_b: Solution):
+    """
+    This class marges the solutions of two sub-instances into a single solution
+
+    Args:
+        sub_inst_a (SubInstance): the first sub-instance.
+        sol_a (Solution): the solution of the first sub-instance.
+        sub_inst_b (SubInstance): the second sub-instance.
+        sol_b (Solution): the solution of the second sub-instance.
+    """
 
     assert(sub_inst_a.nservers == sub_inst_b.nservers
            == sol_a.nservers == sol_b.nservers)
@@ -196,11 +204,21 @@ def rec_load_dependencies(instance: Instance, file: CompiledFile):
 
 
 def solve_instance(instance: Instance):
-    # solve sub-instances
+    """
+    This class solves an instance of the Hash Code 2019 final problem by splitting the original problem
+    into multiple subproblems, each comprising a single target file.
+    The subproblems are solved via a MIP optimization whenever the problem size is not too big. In the latter case,
+    an heuristic is used. 
+    Finally, the solutions of the subproblems are merged into a single solution.
+
+    Args:
+        instance (Instance): the Hash Code 2019 final instance to solve
+    """
+
     num_targets = len(instance.targets)
     sub_sol, sub_inst = [], []
     scores = [0] * num_targets
-    progress(0, num_targets, '')
+    progress(0, num_targets*2, '')
     counter = 0
     delta = []
 
@@ -208,57 +226,54 @@ def solve_instance(instance: Instance):
 
         assert(target in instance.files)
 
-        progress(counter, num_targets)
+        progress(counter, num_targets*2, f'{instance.name} - solving subinstances')
 
         # create sub-problem
         relevant_files_list = [instance.files[target]]
         dependencies = rec_load_dependencies(instance, target)
-        if len(dependencies) > 100:
-            relevant_files_list.extend(dependencies)
-            print([file.name for file in dependencies])
-            relevant_files_list.reverse()   # dependencies first
-            unique_file_list = []
-            for elem in relevant_files_list:
-                already_there = [file.name for file in unique_file_list]
-                if(elem.name not in already_there):
-                    unique_file_list.append(elem)
-            relevant_files_dict = {}
-            for file in unique_file_list:
-                relevant_files_dict[file.name] = file
-            # print(f'Solving subinstance of size: {len(relevant_files_list)} and nservers: {instance.nservers}')
+        relevant_files_list.extend(dependencies)
+        relevant_files_list.reverse()   # dependencies first
+        unique_file_list = []
+        for elem in relevant_files_list:
+            already_there = [file.name for file in unique_file_list]
+            if(elem.name not in already_there):
+                unique_file_list.append(elem)
+        relevant_files_dict = {}
+        for file in unique_file_list:
+            relevant_files_dict[file.name] = file
+        # print(f'Solving subinstance of size: {len(relevant_files_list)} and nservers: {instance.nservers}')
 
-            sub_problem = SubInstance(
-                unique_file_list, relevant_files_dict, target, instance.nservers)
-            heuristic_solution = heuristically_solve_sub_instance(sub_problem)
-            if (len(unique_file_list) < N_FILES_THRESHOLD):
-                [found, obj] = optimally_solve_sub_instance(
-                    sub_problem, heuristic_solution)
-                if found:
-                    tf = sub_problem.target
-                    t_aval_time = min([heuristic_solution.filesAvailTime[j][tf]
-                                    for j in range(sub_problem.nservers)])
-                    delta.append(t_aval_time - obj)
-                else:
-                    delta.append(0)
+        sub_problem = SubInstance(
+            unique_file_list, relevant_files_dict, target, instance.nservers)
+        heuristic_solution = heuristically_solve_sub_instance(sub_problem)
+        if (len(unique_file_list) < N_FILES_THRESHOLD):
+            [found, obj] = optimally_solve_sub_instance(
+                sub_problem, heuristic_solution)
+            if found:
+                tf = sub_problem.target
+                t_aval_time = min([heuristic_solution.filesAvailTime[j][tf]
+                                for j in range(sub_problem.nservers)])
+                delta.append(t_aval_time - obj)
+            else:
+                delta.append(0)
 
-            #check no overlapping compilations
-            for server in range(instance.nservers):
-                time = 0
-                for step in heuristic_solution.compSteps[server]:
-                    stime = heuristic_solution.getSchedTime(step, server)
-                    ctime = sub_problem.filesDict[step].ctime
-                    if (stime < time):
-                        print(step)
-                    assert(stime >= time)
-                    time = stime + ctime
+        #check no overlapping compilations
+        for server in range(instance.nservers):
+            time = 0
+            for step in heuristic_solution.compSteps[server]:
+                stime = heuristic_solution.getSchedTime(step, server)
+                ctime = sub_problem.filesDict[step].ctime
+                if (stime < time):
+                    print(step)
+                assert(stime >= time)
+                time = stime + ctime
 
 
-            sub_inst.append(sub_problem)
-            sub_sol.append(heuristic_solution)
-            counter = counter + 1
+        sub_inst.append(sub_problem)
+        sub_sol.append(heuristic_solution)
+        counter = counter + 1
 
     # sort the targets
-    progress(counter, num_targets, 'Merging subinstances')
     assert(len(sub_sol) == len(sub_inst) == len(scores))
     for i in range(len(sub_sol)):
         tf = sub_inst[i].target
@@ -268,25 +283,32 @@ def solve_instance(instance: Instance):
         if (t_aval_time <= deadline):
             scores[i] = deadline - t_aval_time + \
                 sub_inst[i].get_compil_points()
-    print(scores)
+    #print(scores)
 
     # get the indices of the list sorted in descending order
-    # idxes = np.flip(np.argsort(np.argsort(scores)))
+    idxes = np.flip(np.argsort(np.argsort(scores)))
 
     # solution = sub_sol[idxes[0]]
     # prev_inst = sub_inst[idxes[0]]
     # for i in range(1, len(sub_sol)):
+    #     progress(counter, num_targets*2, 'Merging subinstances')
     #     if(scores[idxes[i]] > 0):  # skip subproblems we couldn't solve
     #         solution = merge_sub_instances(
     #             prev_inst, solution, sub_inst[idxes[i]], sub_sol[idxes[i]])
     #         prev_inst = sub_sol[idxes[i]]
+    #     counter = counter + 1
+    # progress(counter, num_targets*2, 'Solved instance')
 
     solution = sub_sol[0]
     prev_inst = sub_inst[0]
+    counter = counter + 1
     for i in range(1, len(sub_sol)):
-        if(scores[i] > 0):
+        progress(counter, num_targets*2, f'{instance.name} - merging subinstances')
+        counter = counter + 1
+        if(scores[i] > 0):  # skip subproblems we couldn't solve
             solution = merge_sub_instances(
                 prev_inst, solution, sub_inst[i], sub_sol[i])
             prev_inst = sub_sol[i]
+    progress(counter, num_targets*2, f'{instance.name} - solved')
 
     return solution
