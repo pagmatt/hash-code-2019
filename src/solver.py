@@ -180,7 +180,7 @@ def merge_sub_instances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: Su
     return sol_a
 
 
-def rec_load_dependencies(instance: Instance, file: CompiledFile) -> list[str]:
+def rec_load_dependencies(instance: Instance, file: CompiledFile) -> "list[str]":
     dependencies = []
     for dep in instance.files[file].dependencies:
         dependencies.append(instance.files[dep])

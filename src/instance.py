@@ -1,5 +1,5 @@
 class CompiledFile():
-	def __init__(self, name: str, ctime: int, rtime: int, dependencies: list[str]):
+	def __init__(self, name: str, ctime: int, rtime: int, dependencies: "list[str]"):
 		self.name = name
 		self.ctime = ctime
 		self.rtime = rtime
@@ -10,7 +10,7 @@ class CompiledFile():
 		return f'{self.name} ctime={self.ctime}, rtime={self.rtime}, deps={self.dependencies}, deadline={self.deadline}, points={self.points}'
 
 class Instance():
-	def __init__(self, files: list[CompiledFile], targets: list[str], nservers: int, name: str):
+	def __init__(self, files: "list[CompiledFile]", targets: "list[str]", nservers: int, name: str):
 		self.files = files
 		self.targets = targets
 		self.nservers = nservers
@@ -51,7 +51,7 @@ def loadInstance(filename: str) -> Instance:
 		return Instance(files, targets, nservers, filename)
 
 class SubInstance ():
-	def __init__(self, filesList: list[CompiledFile], filesDict: dict, target: list, nservers):
+	def __init__(self, filesList: "list[CompiledFile]", filesDict: dict, target: list, nservers):
 		self.filesList = filesList
 		self.filesDict = filesDict
 		self.target = target
