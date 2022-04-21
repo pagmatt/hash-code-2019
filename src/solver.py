@@ -5,7 +5,7 @@ from itertools import product, chain
 from mip import *
 from progress import *
 
-N_FILES_THRESHOLD = 50 #75
+N_FILES_THRESHOLD = 10 #75
 MAX_SEC_OVERALL = 40  # secods
 MAX_SEC_SAME_INCUMBENT = 30  # seconds
 
@@ -236,11 +236,9 @@ def solve_instance(instance: Instance) -> Solution:
             [found, mip_solution] = optimally_solve_sub_instance(
                 sub_problem, sub_pr_solution)
             if found: # did we obtain a better solution? if so, use the MIP one
-                print('MIP solution found')
                 tf = sub_problem.target
                 heur_t = min([sub_pr_solution.filesAvailTime[j][tf] for j in range(sub_problem.nservers)])
                 mip_t = min([mip_solution.filesAvailTime[j][tf] for j in range(sub_problem.nservers)])
-                print(f'using heuristic: {heur_t}, MILP: {mip_t}')
                 if  mip_t < heur_t:
                     solution = mip_solution
 
@@ -250,8 +248,6 @@ def solve_instance(instance: Instance) -> Solution:
             for step in sub_pr_solution.compSteps[server]:
                 stime = sub_pr_solution.getSchedTime(step, server)
                 ctime = sub_problem.filesDict[step].ctime
-                if (stime < time):
-                    print(step)
                 assert(stime >= time)
                 time = stime + ctime
 
