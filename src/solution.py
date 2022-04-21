@@ -22,12 +22,12 @@ class Solution():
 			print(self.compSteps[s])
 
 	def evalCheck(self, instance) -> int:
-		# prevent side-effects by declaring here temporary structures
-		avail_times = [{} for s in range(self.nservers)]
-		times = [0 for s in range(self.nservers)]
 		# queue of compilation steps for each server
 		queues = [deque(self.compSteps[s]) for s in range(instance.nservers)]
-		
+		# current time at each server
+		time = [0 for s in range(instance.nservers)]
+		# files ready at each server (with corresponding time)
+		files = [{} for s in range(instance.nservers)]
 		# simulate compilation
 		while(True):
 			nDone = 0
@@ -38,25 +38,31 @@ class Solution():
 				# check if all dependencies are satisfied
 				cf = instance.files[f]
 				depOk = True
-				startTime = times[s]
+				startTime = time[s]
 				for dep in cf.dependencies:
-					if dep not in avail_times[s]:
+					if dep not in files[s]:
 						depOk = False
 						break
 					else:
-						startTime = max(startTime, avail_times[s][dep])
+						startTime = max(startTime, files[s][dep])
 				if depOk:
+					#print(f'Execute {cf.name} on server {s} at time {startTime}-{startTime+cf.ctime}')
 					# remove it from queue
 					queues[s].popleft()
 					# we can execute f on s
 					nDone += 1
-					# mark f available (either compilation or replication)
+					# mark f available (either by compilation or replication)
+					# NOTE: the same file might be compiled multiple times, either on the same server or on multiple servers.
+					#       Thus, we must be careful of not overwriting the time a file is available with a higher value.
 					for otherS in range(instance.nservers):
-						if otherS != s:
-							avail_times[otherS][cf.name] = startTime + cf.ctime + cf.rtime
+						afterCompilation = startTime + cf.ctime
+						afterReplication = afterCompilation + cf.rtime
+						afterTime = afterReplication if otherS != s else afterCompilation
+						if cf.name in files[otherS]:
+							files[otherS][cf.name] = min(files[otherS][cf.name], afterTime)
 						else:
-							avail_times[otherS][cf.name] = startTime + cf.ctime
-					times[s] = startTime + cf.ctime
+							files[otherS][cf.name] = afterTime
+					time[s] = startTime + cf.ctime
 			if not nDone:
 				break
 		# if queues are not empty, then we have messed up with dependencies
@@ -65,18 +71,17 @@ class Solution():
 		# merge files from all servers
 		targets = {}
 		for s in range(instance.nservers):
-			for f in avail_times[s]:
+			for f in files[s]:
 				if f in targets:
-					targets[f] = min(targets[f], avail_times[s][f])
+					targets[f] = min(targets[f], files[s][f])
 				else:
-					targets[f] = avail_times[s][f]
+					targets[f] = files[s][f]
 		# evaluate targets
 		score = 0
 		for t in targets:
 			cf = instance.files[t]
 			if (cf.points > 0) and (targets[t] <= cf.deadline):
 				score += (cf.deadline - targets[t]) + cf.points
-
 		return score
 	
 	def add_step(self, fname: str, server: int, instance: SubInstance):
