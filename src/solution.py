@@ -13,7 +13,8 @@ class Solution():
 		self.nservers = nservers	
 		self.compSteps = [[] for s in range(self.nservers)]			# compilation steps performed at each server. Kept in chronological order
 		self.filesAvailTime = [{} for s in range(self.nservers)]	# times when files are ready at each server 
-		self.filesCompTime = []
+		self.filesCompTimeList = []
+		self.filesCompTimeDict = {}									# faster to search, but not sorted time wise
 		self.currTime = [0 for s in range(self.nservers)]			# current time at each server ~ last instant during which a file is compiled
 		self.gaps = [False for s in range(self.nservers)]			# are there gaps between compilation in a given server ?
 
@@ -119,14 +120,14 @@ class Solution():
 			# self.occupancy[server] = self.occupancy[server] + instance.filesDict[fname].ctime
 			idx = 0
 			file_before = None
-			while(idx < len(self.filesCompTime)):
-				if self.filesCompTime[idx].sched_time < s_time:
-					if self.filesCompTime[idx].server == server:
-						file_before = self.filesCompTime[idx].fname
+			while(idx < len(self.filesCompTimeList)):
+				if self.filesCompTimeList[idx].sched_time < s_time:
+					if self.filesCompTimeList[idx].server == server:
+						file_before = self.filesCompTimeList[idx].fname
 					idx = idx + 1
 				else:
 					break
-			self.filesCompTime.insert(idx, SchedFile(fname, s_time, server))
+			self.filesCompTimeList.insert(idx, SchedFile(fname, s_time, server))
 
 			# re-order comp steps if compiled in a gap. TODO: use insertion sort here as well
 			# idx = 0
@@ -140,6 +141,7 @@ class Solution():
 			if file_before is not None:
 				comp_steps_idx = self.compSteps[server].index(file_before) + 1
 			self.compSteps[server].insert(comp_steps_idx, fname) 
+			self.filesCompTimeDict[(fname, server)] = s_time
 
 	
 	def get_earliest_server_for_file(self, fname: str, instance: SubInstance):
@@ -173,17 +175,14 @@ class Solution():
 		return earliest_server
 
 	def getSchedTime(self, fname: str, server: int):
-		time = -1
-		for sched in self.filesCompTime:
-			if sched.fname == fname and sched.server == server:
-				time = sched.sched_time
-		assert(time != -1)
+		assert((fname, server) in self.filesCompTimeDict.keys())
+		time = self.filesCompTimeDict[(fname, server)]
 		return time
 
 	def printSolution(self, out_name: str):
 		with open(out_name, 'w+') as f:
-			print(len(self.filesCompTime), file=f)
-			for sched_file in self.filesCompTime:
+			print(len(self.filesCompTimeList), file=f)
+			for sched_file in self.filesCompTimeList:
 				print(f'{sched_file.fname} {sched_file.server}', file=f)
 
 			f.close()

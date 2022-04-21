@@ -179,7 +179,7 @@ def merge_sub_instances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: Su
     tf = sub_inst_b.filesDict[sub_inst_b.target]
     sol_a_old = copy.deepcopy(sol_a)
 
-    for sched_file in sol_b.filesCompTime:
+    for sched_file in sol_b.filesCompTimeList:
         flat_steps = list(chain(*sol_a.compSteps))
         if(sched_file.fname not in flat_steps):
             earliest_s = sol_a.get_earliest_server_for_file(sched_file.fname, sub_inst_b)
