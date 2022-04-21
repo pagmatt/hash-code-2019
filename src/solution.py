@@ -118,8 +118,11 @@ class Solution():
 			self.currTime[server] = max(s_time + instance.filesDict[fname].ctime, self.currTime[server])
 			# self.occupancy[server] = self.occupancy[server] + instance.filesDict[fname].ctime
 			idx = 0
+			file_before = None
 			while(idx < len(self.filesCompTime)):
-				if (self.filesCompTime[idx].sched_time < s_time):
+				if self.filesCompTime[idx].sched_time < s_time:
+					if self.filesCompTime[idx].server == server:
+						file_before = self.filesCompTime[idx].fname
 					idx = idx + 1
 				else:
 					break
@@ -133,11 +136,10 @@ class Solution():
 			# 	else:
 			# 		break
 			# self.filesCompTime.insert(idx, SchedFile(fname, s_time, server))
-
-			self.compSteps[server] = []
-			for sched_file in self.filesCompTime: 
-				if sched_file.server == server:
-					self.compSteps[server].append(sched_file.fname)
+			comp_steps_idx = 0
+			if file_before is not None:
+				comp_steps_idx = self.compSteps[server].index(file_before) + 1
+			self.compSteps[server].insert(comp_steps_idx, fname) 
 
 	
 	def get_earliest_server_for_file(self, fname: str, instance: SubInstance):

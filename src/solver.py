@@ -5,9 +5,9 @@ from itertools import product, chain
 from mip import *
 from progress import *
 
-N_FILES_THRESHOLD = 1
-MAX_SEC_OVERALL = 50  # secods
-MAX_SEC_SAME_INCUMBENT = 20  # seconds
+N_FILES_THRESHOLD = 1 #75
+MAX_SEC_OVERALL = 40  # secods
+MAX_SEC_SAME_INCUMBENT = 30  # seconds
 
 
 def optimally_solve_sub_instance(sub_instance: SubInstance, init_solution: Solution = None):

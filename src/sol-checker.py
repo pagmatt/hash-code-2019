@@ -22,7 +22,6 @@ if __name__ == '__main__':
 			solution.printSolution(f'{solution_path}{fn_sol}')
 			solution_from_file = loadSolution(f'{solution_path}{fn_sol}', instance)
 			instance_score = solution_from_file.evalCheck(instance)
-			#print(f'Score = "{instance_score}')
 			overall_score = overall_score + instance_score
 
 	print(f'\nOverall score = {overall_score}')
