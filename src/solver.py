@@ -215,16 +215,22 @@ def solve_instance(instance: Instance):
         dependencies = rec_load_dependencies(instance, target)
         if len(dependencies) > 100:
             relevant_files_list.extend(dependencies)
+            print([file.name for file in dependencies])
             relevant_files_list.reverse()   # dependencies first
+            unique_file_list = []
+            for elem in relevant_files_list:
+                already_there = [file.name for file in unique_file_list]
+                if(elem.name not in already_there):
+                    unique_file_list.append(elem)
             relevant_files_dict = {}
-            for file in relevant_files_list:
+            for file in unique_file_list:
                 relevant_files_dict[file.name] = file
             # print(f'Solving subinstance of size: {len(relevant_files_list)} and nservers: {instance.nservers}')
 
             sub_problem = SubInstance(
-                relevant_files_list, relevant_files_dict, target, instance.nservers)
+                unique_file_list, relevant_files_dict, target, instance.nservers)
             heuristic_solution = heuristically_solve_sub_instance(sub_problem)
-            if (len(relevant_files_list) < N_FILES_THRESHOLD):
+            if (len(unique_file_list) < N_FILES_THRESHOLD):
                 [found, obj] = optimally_solve_sub_instance(
                     sub_problem, heuristic_solution)
                 if found:
@@ -241,7 +247,9 @@ def solve_instance(instance: Instance):
                 for step in heuristic_solution.compSteps[server]:
                     stime = heuristic_solution.getSchedTime(step, server)
                     ctime = sub_problem.filesDict[step].ctime
-                    assert(stime + ctime >= time)
+                    if (stime < time):
+                        print(step)
+                    assert(stime >= time)
                     time = stime + ctime
 
 
