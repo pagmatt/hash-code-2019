@@ -12,6 +12,6 @@ The script requires the [Python-MIP](https://www.python-mip.com/) package.
 pip install -r requirements.txt
 
 # compute and evaluate the solutions
-python3 src/compute-solution.py
+python3 src/compute_solution.py
 ```
 
