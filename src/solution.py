@@ -106,41 +106,12 @@ class Solution():
 		# make sure we do not schedule before all the dependencies are available
 		sched_time = max(sched_time, all_dep_avail_time)
 
-		# if we creating a gap, record it
-		if sched_time > self.currTime[server]:
-			self.gaps[server] = True
-
 		#TODO: schedule dependencies twice (on a different server) if it makes sense to do so
 		# while(avail_time > min(self.currTime)):
 		
 		# make sure we do not schedule twice a file on the same server
 		if(fname not in self.compSteps[server]):	
-			for otherS in range(instance.nservers):
-				if otherS != server:
-					self.filesAvailTime[otherS][fname] = sched_time + instance.filesDict[fname].ctime + \
-													instance.filesDict[fname].rtime
-				else:
-					self.filesAvailTime[otherS][fname] = sched_time + instance.filesDict[fname].ctime		
-			self.currTime[server] = max(sched_time + instance.filesDict[fname].ctime, self.currTime[server])
-			self.filesCompTimeDict[(fname, server)] = sched_time
-
-			# insertion sort in the compilation time list
-			idx = 0
-			file_before = None
-			while(idx < len(self.filesCompTimeList)):
-				if self.filesCompTimeList[idx].sched_time < sched_time:
-					if self.filesCompTimeList[idx].server == server:
-						file_before = self.filesCompTimeList[idx].fname
-					idx = idx + 1
-				else:
-					break
-			self.filesCompTimeList.insert(idx, SchedFile(fname, sched_time, server))
-
-			# insertion sort in the compilation steps server-specific list
-			comp_steps_idx = 0
-			if file_before is not None:
-				comp_steps_idx = self.compSteps[server].index(file_before) + 1	# schedule just after
-			self.compSteps[server].insert(comp_steps_idx, fname) 
+			self.recordNewCompilation(instance, sched_time, server, fname)
 	
 	def get_earliest_server_for_file(self, fname: str, instance: SubInstance) -> int:
 		"""
@@ -189,8 +160,43 @@ class Solution():
 			print(len(self.filesCompTimeList), file=f)
 			for sched_file in self.filesCompTimeList:
 				print(f'{sched_file.fname} {sched_file.server}', file=f)
-
 			f.close()
+	
+	def recordNewCompilation(self, instance: SubInstance, sched_time: int, server: int, fname: str):
+
+		# if we creating a gap, record it
+		if sched_time > self.currTime[server]:
+			self.gaps[server] = True
+
+		# update availability time
+		for otherS in range(instance.nservers):
+			if otherS != server:
+				self.filesAvailTime[otherS][fname] = sched_time + instance.filesDict[fname].ctime + \
+												instance.filesDict[fname].rtime
+			else:
+				self.filesAvailTime[otherS][fname] = sched_time + instance.filesDict[fname].ctime	
+
+		# update time counter	
+		self.currTime[server] = max(sched_time + instance.filesDict[fname].ctime, self.currTime[server])
+		# update dict (does not need to be sorted)
+		self.filesCompTimeDict[(fname, server)] = sched_time
+
+		# use insertion sort to update data structures which are kept orderd w.r.t. compilation time
+		idx = 0
+		file_before = None
+		while(idx < len(self.filesCompTimeList)):
+			if self.filesCompTimeList[idx].sched_time < sched_time:
+				if self.filesCompTimeList[idx].server == server:
+					file_before = self.filesCompTimeList[idx].fname
+				idx = idx + 1
+			else:
+				break
+		self.filesCompTimeList.insert(idx, SchedFile(fname, sched_time, server))
+
+		comp_steps_idx = 0
+		if file_before is not None:
+			comp_steps_idx = self.compSteps[server].index(file_before) + 1	# schedule just after
+		self.compSteps[server].insert(comp_steps_idx, fname) 
 
 def loadSolution(fname: str, instance: Instance) -> Solution:
 	with open(fname) as fp:
