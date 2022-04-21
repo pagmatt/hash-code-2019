@@ -17,7 +17,6 @@ if __name__ == '__main__':
 		for fn in instances_fns:
 			instance = loadInstance(f'{path}{fn}')
 			solution = solve_instance(instance)
-
 			fn_sol = fn.replace('.in', '.out')
 			solution.printSolution(f'{solution_path}{fn_sol}')
 			solution_from_file = loadSolution(f'{solution_path}{fn_sol}', instance)
