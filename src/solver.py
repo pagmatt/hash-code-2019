@@ -12,7 +12,7 @@ MAX_SEC_SAME_INCUMBENT = 30  # seconds
 
 def optimally_solve_sub_instance(sub_instance: SubInstance, init_solution: Solution = None):
     """
-    This class solves in an optimal manner a sub-instance of the problem 
+    This function solves in an optimal manner a sub-instance of the original problem 
     by formulating it as a MIP problem and the solving it with the Python-MIP library.
 
     Args:
@@ -133,7 +133,7 @@ def optimally_solve_sub_instance(sub_instance: SubInstance, init_solution: Solut
     return [found, obj]
 
 
-def heuristically_solve_sub_instance(sub_instance: SubInstance):
+def heuristically_solve_sub_instance(sub_instance: SubInstance) -> Solution:
     """
     This class solves via an ad-hoc heuristic a sub-instance of the problem.
     Since it is (in principle) sub-optimal, it is used only whenever the sub-instance is too big
@@ -149,20 +149,10 @@ def heuristically_solve_sub_instance(sub_instance: SubInstance):
             file.name, sub_instance)
         heuristic_sol.add_step(file.name, earliest_s, sub_instance)
 
-
-    #plot a sketch of the subproblem result
-
-    # from matplotlib import pyplot as plt
-    # fig, ax = plt.subplots()
-    # for s in range(heuristic_sol.nservers):
-    #     for f in heuristic_sol.compSteps[s]:
-    #         ax.barh(s, width=sub_instance.filesDict[f].ctime, left=heuristic_sol.filesAvailTime[s][f] - sub_instance.filesDict[f].ctime, alpha=0.5)
-    # plt.show()
-
     return heuristic_sol
 
 
-def merge_sub_instances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: SubInstance, sol_b: Solution):
+def merge_sub_instances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: SubInstance, sol_b: Solution) -> Solution:
     """
     This class marges the solutions of two sub-instances into a single solution
 
@@ -193,7 +183,7 @@ def merge_sub_instances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: Su
     return sol_a
 
 
-def rec_load_dependencies(instance: Instance, file: CompiledFile):
+def rec_load_dependencies(instance: Instance, file: CompiledFile) -> list[str]:
     dependencies = []
     for dep in instance.files[file].dependencies:
         dependencies.append(instance.files[dep])
@@ -203,7 +193,7 @@ def rec_load_dependencies(instance: Instance, file: CompiledFile):
     return dependencies
 
 
-def solve_instance(instance: Instance):
+def solve_instance(instance: Instance) -> Solution:
     """
     This class solves an instance of the Hash Code 2019 final problem by splitting the original problem
     into multiple subproblems, each comprising a single target file.
