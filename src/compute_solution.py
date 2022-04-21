@@ -5,7 +5,6 @@ import os
 from solver import solve_instance
 
 instances_paths = ['./instances/', './bigger_instances/']
-
 solution_path = './solution/'
 
 if __name__ == '__main__':
