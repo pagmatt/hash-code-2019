@@ -86,25 +86,12 @@ class Solution():
 	
 	def add_step(self, fname: str, server: int, instance: SubInstance):
 		assert(fname in instance.filesDict.keys())
-		all_dep_avail_time, sched_time = 0, 0		
-		for dep in instance.filesDict[fname].dependencies:			# make sure the dependencies are available
-			assert(dep in self.filesAvailTime[server])
-			all_dep_avail_time = max(all_dep_avail_time, self.filesAvailTime[server][dep])
 
-		# if there are gaps in the current schedule, try to fit the compilation there
-		if self.gaps[server]:
-			for step in self.compSteps[server]:
-				if self.getSchedTime(step, server) > sched_time + instance.filesDict[fname].ctime and \
-					sched_time >= all_dep_avail_time:
-					# can schedule here
-					break;
-				else:
-					sched_time = self.filesAvailTime[server][step]
-		else:
-			sched_time = self.currTime[server]
+		dep_avail_time = self.getDepAvailTime(instance, fname, server)
+		sched_time = self.getEarliestGapToSched(instance, server, fname, dep_avail_time)
 		
 		# make sure we do not schedule before all the dependencies are available
-		sched_time = max(sched_time, all_dep_avail_time)
+		sched_time = max(sched_time, dep_avail_time)
 
 		#TODO: schedule dependencies twice (on a different server) if it makes sense to do so
 		# while(avail_time > min(self.currTime)):
@@ -113,7 +100,7 @@ class Solution():
 		if(fname not in self.compSteps[server]):	
 			self.recordNewCompilation(instance, sched_time, server, fname)
 	
-	def get_earliest_server_for_file(self, fname: str, instance: SubInstance) -> int:
+	def getEarliestServerForFile(self, fname: str, instance: SubInstance) -> int:
 		"""
 		This function finds and returns the index of the earliest server we can compile file fname on.
 
@@ -127,21 +114,12 @@ class Solution():
 		earliest_server = -1
 		earliest_time = sys.maxsize
 		for s in range(self.nservers):
-			s_time, avail_time = 0, 0
+			s_time =  0
 
-			for dep in instance.filesDict[fname].dependencies:
-				assert(dep in self.filesAvailTime[s])
-				avail_time = max(avail_time, self.filesAvailTime[s][dep])
+			dep_avail_time = self.getDepAvailTime(instance, fname, s)
+			s_time = self.getEarliestGapToSched(instance, s, fname, dep_avail_time)
 
-			for step in self.compSteps[s]:
-				if self.getSchedTime(step, s) > s_time + instance.filesDict[fname].ctime and \
-					s_time >= avail_time:
-					# can sched here
-					break;
-				else:
-					s_time = self.filesAvailTime[s][step]
-
-			s_time = max(s_time, avail_time)
+			s_time = max(s_time, dep_avail_time)
 				
 			if (s_time < earliest_time):
 				earliest_time = s_time
@@ -197,6 +175,32 @@ class Solution():
 		if file_before is not None:
 			comp_steps_idx = self.compSteps[server].index(file_before) + 1	# schedule just after
 		self.compSteps[server].insert(comp_steps_idx, fname) 
+	
+	def getDepAvailTime(self, instance: SubInstance, fname: str, server: int):
+
+		all_dep_avail_time = 0
+		for dep in instance.filesDict[fname].dependencies:			# make sure the dependencies are available
+			assert(dep in self.filesAvailTime[server])
+			all_dep_avail_time = max(all_dep_avail_time, self.filesAvailTime[server][dep])
+
+		return all_dep_avail_time
+
+	def getEarliestGapToSched(self, instance: SubInstance, server: int, fname: str, dep_avail_time: int):
+
+		# if there are gaps in the current schedule, try to fit the compilation there
+		sched_time = 0
+		if self.gaps[server]:
+			for step in self.compSteps[server]:
+				if self.getSchedTime(step, server) > sched_time + instance.filesDict[fname].ctime and \
+					sched_time >= dep_avail_time:
+					# can schedule here
+					break;
+				else:
+					sched_time = self.filesAvailTime[server][step]
+		else:
+			sched_time = self.currTime[server]
+
+		return sched_time
 
 def loadSolution(fname: str, instance: Instance) -> Solution:
 	with open(fname) as fp:
