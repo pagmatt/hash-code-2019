@@ -5,11 +5,12 @@ from itertools import product, chain
 from mip import *
 from progress import *
 
-N_FILES_THRESHOLD = 10 #75
+N_FILES_THRESHOLD = 10  # 75
 MAX_SEC_OVERALL = 40  # secods
 MAX_SEC_SAME_INCUMBENT = 30  # seconds
 
-def optimally_solve_sub_instance(sub_instance: SubInstance, init_solution: Solution = None):
+
+def optimallySolveSubInstance(sub_instance: SubInstance, init_solution: Solution = None):
     """
     This function solves in an optimal manner a sub-instance of the original problem 
     by formulating it as a MIP problem and the solving it with the Python-MIP library.
@@ -39,9 +40,9 @@ def optimally_solve_sub_instance(sub_instance: SubInstance, init_solution: Solut
                   + sum([file.rtime for file in sub_instance.filesList]))
 
     # constraints to try and reduce the computational load
-    model += z <= sub_instance.get_deadline()
+    model += z <= sub_instance.getDeadline()
     for (i, j) in product(range(f), range(s)):
-        model += t[i][j] <= sub_instance.get_deadline()
+        model += t[i][j] <= sub_instance.getDeadline()
 
     # definition of the dummy objective
     for (i, j) in product(range(f), range(s)):
@@ -52,7 +53,7 @@ def optimally_solve_sub_instance(sub_instance: SubInstance, init_solution: Solut
         deps = sub_instance.filesList[j].dependencies
         for dep in deps:
             for i in range(s):
-                ctime, _, idx = sub_instance.get_times_and_idx(dep)
+                ctime, _, idx = sub_instance.getTimesAndIdx(dep)
                 model += t[j][i] >= t[idx][i] + ctime - \
                     bigM*(2 - x[j][i] - x[idx][i])
 
@@ -62,7 +63,7 @@ def optimally_solve_sub_instance(sub_instance: SubInstance, init_solution: Solut
         for dep in deps:
             for (i, k) in product(range(s), range(s)):
                 if (i != k):  # if different servers
-                    ctime, rtime, idx = sub_instance.get_times_and_idx(dep)
+                    ctime, rtime, idx = sub_instance.getTimesAndIdx(dep)
                     model += t[j][i] >= t[idx][k] + ctime + \
                         rtime - bigM*(2 - x[j][i] - x[idx][k])
 
@@ -93,7 +94,7 @@ def optimally_solve_sub_instance(sub_instance: SubInstance, init_solution: Solut
         # set values for x variables
         for s_idx in range(s):
             for step in init_solution.compSteps[s_idx]:
-                ctime, _, f_idx = sub_instance.get_times_and_idx(step)
+                ctime, _, f_idx = sub_instance.getTimesAndIdx(step)
                 x_start[s_idx][f_idx] = 1
                 t_start[s_idx][f_idx] = init_solution.filesAvailTime[s_idx][step] - ctime
 
@@ -124,13 +125,13 @@ def optimally_solve_sub_instance(sub_instance: SubInstance, init_solution: Solut
         for (j, i) in product(range(f), range(s)):
             if (x[j][i].x >= 0.99):
                 fname = sub_instance.filesList[j].name
-                time = int(t[j][i].x) 
+                time = int(t[j][i].x)
                 solution.recordNewCompilation(sub_instance, time, i, fname)
 
     return [found, solution]
 
 
-def heuristically_solve_sub_instance(sub_instance: SubInstance) -> Solution:
+def heuristicallySolveSubInstance(sub_instance: SubInstance) -> Solution:
     """
     This class solves via an ad-hoc heuristic a sub-instance of the problem.
     Since it is (in principle) sub-optimal, it is used only whenever the sub-instance is too big
@@ -142,14 +143,14 @@ def heuristically_solve_sub_instance(sub_instance: SubInstance) -> Solution:
     heuristic_sol = Solution(sub_instance.nservers)
 
     for file in sub_instance.filesList:
-        earliest_s = heuristic_sol.get_earliest_server_for_file(
+        earliest_s = heuristic_sol.getEarliestServerForFile(
             file.name, sub_instance)
         heuristic_sol.add_step(file.name, earliest_s, sub_instance)
 
     return heuristic_sol
 
 
-def merge_sub_instances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: SubInstance, sol_b: Solution) -> Solution:
+def mergeSubInstances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: SubInstance, sol_b: Solution) -> Solution:
     """
     This class marges the solutions of two sub-instances into a single solution
 
@@ -169,28 +170,29 @@ def merge_sub_instances(sub_inst_a: SubInstance, sol_a: Solution, sub_inst_b: Su
     for sched_file in sol_b.filesCompTimeList:
         flat_steps = list(chain(*sol_a.compSteps))
         if(sched_file.fname not in flat_steps):
-            earliest_s = sol_a.get_earliest_server_for_file(sched_file.fname, sub_inst_b)
+            earliest_s = sol_a.getEarliestServerForFile(
+                sched_file.fname, sub_inst_b)
             sol_a.add_step(sched_file.fname, earliest_s, sub_inst_b)
 
     # did we manage to compile the target in time? if not, remove the new compilations
     t_aval_time = min([sol_a.filesAvailTime[i][tf.name] for i in range(s)])
-    if (t_aval_time > sub_inst_b.get_deadline()):
+    if (t_aval_time > sub_inst_b.getDeadline()):
         sol_a = sol_a_old
 
     return sol_a
 
 
-def rec_load_dependencies(instance: Instance, file: CompiledFile) -> "list[str]":
+def recLoadDependencies(instance: Instance, file: CompiledFile) -> "list[str]":
     dependencies = []
     for dep in instance.files[file].dependencies:
         dependencies.append(instance.files[dep])
         if (len(instance.files[dep].dependencies) > 0):
-            dependencies.extend(rec_load_dependencies(instance, dep))
+            dependencies.extend(recLoadDependencies(instance, dep))
 
     return dependencies
 
 
-def solve_instance(instance: Instance) -> Solution:
+def solveInstance(instance: Instance) -> Solution:
     """
     This class solves an instance of the Hash Code 2019 final problem by splitting the original problem
     into multiple subproblems, each comprising a single target file.
@@ -204,7 +206,8 @@ def solve_instance(instance: Instance) -> Solution:
 
     num_targets = len(instance.targets)
     sub_sol, sub_inst = [], []
-    sol_score = [0] * num_targets   # represents how "good" a solution of a sub-instance is
+    # represents how "good" a solution of a sub-instance is
+    sol_score = [0] * num_targets
     progress(0, num_targets*2, '')
     counter = 0
     delta = []
@@ -213,11 +216,12 @@ def solve_instance(instance: Instance) -> Solution:
 
         assert(target in instance.files)
 
-        progress(counter, num_targets*2, f'{instance.name} - solving subinstance')
+        progress(counter, num_targets*2,
+                 f'{instance.name} - solving subinstance')
 
         # create sub-problem
         relevant_files_list = [instance.files[target]]
-        dependencies = rec_load_dependencies(instance, target)
+        dependencies = recLoadDependencies(instance, target)
         relevant_files_list.extend(dependencies)
         relevant_files_list.reverse()   # dependencies first
         unique_file_list = []
@@ -231,18 +235,20 @@ def solve_instance(instance: Instance) -> Solution:
 
         sub_problem = SubInstance(
             unique_file_list, relevant_files_dict, target, instance.nservers)
-        sub_pr_solution = heuristically_solve_sub_instance(sub_problem)
+        sub_pr_solution = heuristicallySolveSubInstance(sub_problem)
         if (len(unique_file_list) < N_FILES_THRESHOLD):
-            [found, mip_solution] = optimally_solve_sub_instance(
+            [found, mip_solution] = optimallySolveSubInstance(
                 sub_problem, sub_pr_solution)
-            if found: # did we obtain a better solution? if so, use the MIP one
+            if found:  # did we obtain a better solution? if so, use the MIP one
                 tf = sub_problem.target
-                heur_t = min([sub_pr_solution.filesAvailTime[j][tf] for j in range(sub_problem.nservers)])
-                mip_t = min([mip_solution.filesAvailTime[j][tf] for j in range(sub_problem.nservers)])
-                if  mip_t < heur_t:
+                heur_t = min([sub_pr_solution.filesAvailTime[j][tf]
+                             for j in range(sub_problem.nservers)])
+                mip_t = min([mip_solution.filesAvailTime[j][tf]
+                            for j in range(sub_problem.nservers)])
+                if mip_t < heur_t:
                     solution = mip_solution
 
-        #check no overlapping compilations
+        # check no overlapping compilations
         for server in range(instance.nservers):
             time = 0
             for step in sub_pr_solution.compSteps[server]:
@@ -250,7 +256,6 @@ def solve_instance(instance: Instance) -> Solution:
                 ctime = sub_problem.filesDict[step].ctime
                 assert(stime >= time)
                 time = stime + ctime
-
 
         sub_inst.append(sub_problem)
         sub_sol.append(sub_pr_solution)
@@ -262,11 +267,11 @@ def solve_instance(instance: Instance) -> Solution:
         tf = sub_inst[i].target
         s = sub_inst[i].nservers
         t_aval_time = min([sub_sol[i].filesAvailTime[j][tf] for j in range(s)])
-        deadline = sub_inst[i].get_deadline()
+        deadline = sub_inst[i].getDeadline()
         if (t_aval_time <= deadline):
             sol_score[i] = deadline - t_aval_time + \
-                sub_inst[i].get_compil_points()
-    #print(scores)
+                sub_inst[i].getCompilPoints()
+    # print(scores)
 
     # get the indices of the list sorted in descending order
     idxes = np.argsort(np.argsort(sol_score))
@@ -274,9 +279,10 @@ def solve_instance(instance: Instance) -> Solution:
     solution = sub_sol[idxes[0]]
     prev_inst = sub_inst[idxes[0]]
     for i in range(1, len(sub_sol)):
-        progress(counter, num_targets*2, f'{instance.name} - merging subinstance')
+        progress(counter, num_targets*2,
+                 f'{instance.name} - merging subinstance')
         if(sol_score[idxes[i]] > 0):  # skip subproblems we couldn't solve
-            solution = merge_sub_instances(
+            solution = mergeSubInstances(
                 prev_inst, solution, sub_inst[idxes[i]], sub_sol[idxes[i]])
             prev_inst = sub_sol[idxes[i]]
         counter = counter + 1
