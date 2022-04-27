@@ -99,32 +99,59 @@ class Solution():
         deps = instance.filesDict[fname].dependencies
         dep_avail_time = self.getDepAvailTime(instance, fname, server)
 
+        # if fname == 'cu':
+        #     print(f'cu deps {deps}')
+        #     print(f'avail time {dep_avail_time}')
+
         # schedule more than once, if we would be waiting without doing anything
-        not_avail = [f for f in deps if self.filesAvailTime[server][f] < self.currTime[server]]
-        can_fit = [f for f in not_avail if dep_avail_time \
-             - instance.filesDict[f].ctime > self.currTime[server]]
+        not_avail = [f for f in deps if self.filesAvailTime[server][f] > self.currTime[server]]
+        can_fit = [f for f in not_avail if self.getEarliestGapToSched( \
+            instance, server, f, self.getDepAvailTime(instance, f, server)) + instance.filesDict[f].ctime < self.filesAvailTime[server][f]]
         while(len(can_fit) > 0):
+
             dep_name = can_fit[0]
+            # if fname == 'c5t':
+            #     rec_dep_time = self.getDepAvailTime(instance, dep_name, server)
+            #     print(f'rec dep available at time {rec_dep_time}')
+            #     print(f'reschedule {dep_name} at time {self.getEarliestGapToSched(instance, server, dep_name, rec_dep_time)} needed by {fname}')
+            #     print(f'otherwise available at {self.filesAvailTime[server][dep_name]}')
+            #     print(f'{dep_name} compilation time {instance.filesDict[dep_name].ctime}')
+            #     print(f'already there {self.compSteps[server]}')
+            #     print(f'currTime {self.currTime[server]}, depAvailTime {dep_avail_time}, dep cTime {instance.filesDict[dep_name].ctime}')
+            # print(f'recompiling {dep_name} on server {server}')
+            # print(f'otherwise available at {self.filesAvailTime[server][dep_name]}')
             self.add_step(dep_name, server, instance)
-
-            print(f'adding step {dep_name}')
-
-            # update relevant quantities
+            # print(f'thought to be sched at {self.getEarliestGapToSched(instance, server, dep_name, self.getDepAvailTime(instance, dep_name, server))}')
+            # print(f'scheduled at time {self.getSchedTime(dep_name, server)}')
             assert(dep_name in self.compSteps[server])
-            not_avail = [f for f in deps if self.filesAvailTime[server][f] < self.currTime[server]]
-            can_fit = [f for f in not_avail if dep_avail_time \
-                - instance.filesDict[f].ctime > self.currTime[server]]
+            
+            # update relevant quantities
             dep_avail_time = self.getDepAvailTime(instance, fname, server)
+            not_avail = [f for f in deps if self.filesAvailTime[server][f] > self.currTime[server]]
+            can_fit = [f for f in not_avail if self.getEarliestGapToSched( \
+                instance, server, f, self.getDepAvailTime(instance, f, server)) + instance.filesDict[f].ctime < self.filesAvailTime[server][dep_name]]
+            # if fname == 'c5t':
+            #     print(f'after rescheduling {dep_name} as needed by {fname}')
+            #     print(f'available at {self.filesAvailTime[server][dep_name]}')
+            #     print(f'steps now {self.compSteps[server]}')
+            #     print(f'currTime {self.currTime[server]}, depAvailTime {dep_avail_time}')
 
         sched_time = self.getEarliestGapToSched(
             instance, server, fname, dep_avail_time)
+        
+        # if fname == 'c5t':
+        #     print(f'c5t earliest gap {sched_time}')
 
         # make sure we do not schedule before all the dependencies are available
         sched_time = max(sched_time, dep_avail_time)
-    
+
+        # if fname == 'cu':
+        #     print(f'cu sched time {sched_time}')
 
         # make sure we do not schedule twice a file on the same server
         if(fname not in self.compSteps[server]):
+            # if fname == 'cu':
+            #     print(f'record {fname} compilation at time {sched_time} and server {server}')
             self.recordNewCompilation(instance, sched_time, server, fname)
 
     def getEarliestServerForFile(self, fname: str, instance: SubInstance) -> int:
@@ -236,15 +263,22 @@ class Solution():
         # if there are gaps in the current schedule, try to fit the compilation there
         sched_time = 0
         if self.gaps[server]:
+            # if fname == 'c5t':
+            #     print(f'c5t steps {self.compSteps[server]}')
             for step in self.compSteps[server]:
                 if self.getSchedTime(step, server) > sched_time + instance.filesDict[fname].ctime and \
                         sched_time >= dep_avail_time:
                     # can schedule here
+                    # if fname == 'c5t':
+                    #     print(f'can schedule before {step}, which was sched at {self.getSchedTime(step, server)}')
                     break
                 else:
+                    # if fname == 'c5t':
+                    #     print(f'availtime of {step} is {self.filesAvailTime[server][step]}')
                     sched_time = self.filesAvailTime[server][step]
         else:
-            sched_time = self.currTime[server]
+            sched_time = max(self.currTime[server], dep_avail_time)
+            
 
         return sched_time
 

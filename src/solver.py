@@ -271,7 +271,7 @@ def solveInstance(instance: Instance) -> Solution:
         if (t_aval_time <= deadline):
             sol_score[i] = deadline - t_aval_time + \
                 sub_inst[i].getCompilPoints()
-    # print(scores)
+    print(sol_score)
 
     # get the indices of the list sorted in descending order
     idxes = np.argsort(np.argsort(sol_score))
