@@ -1,0 +1,7 @@
+language: python
+os: linux
+dist: focal
+
+script:
+  # comphte the solutions
+  python3 src/compute_solution.py
