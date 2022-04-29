@@ -1,7 +1,11 @@
 language: python
+python:
+  - "3.8"
 os: linux
 dist: focal
 
+install:
+  pip install -r requirements.txt
 script:
   # comphte the solutions
-  python3 src/compute_solution.py
+  python src/compute_solution.py
