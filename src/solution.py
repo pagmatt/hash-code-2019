@@ -129,7 +129,7 @@ class Solution():
             dep_avail_time = self.getDepAvailTime(instance, fname, server)
             not_avail = [f for f in deps if self.filesAvailTime[server][f] > self.currTime[server]]
             can_fit = [f for f in not_avail if self.getEarliestGapToSched( \
-                instance, server, f, self.getDepAvailTime(instance, f, server)) + instance.filesDict[f].ctime < self.filesAvailTime[server][dep_name]]
+                instance, server, f, self.getDepAvailTime(instance, f, server)) + instance.filesDict[f].ctime < self.filesAvailTime[server][f]]
             # if fname == 'c5t':
             #     print(f'after rescheduling {dep_name} as needed by {fname}')
             #     print(f'available at {self.filesAvailTime[server][dep_name]}')
